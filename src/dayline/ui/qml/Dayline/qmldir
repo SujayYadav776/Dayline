@@ -1,0 +1,4 @@
+# Dayline QML module. Drives all colors/metrics from the Theme singleton —
+# no hard-coded colours anywhere else.
+module Dayline
+singleton Theme 1.0 Theme.qml
