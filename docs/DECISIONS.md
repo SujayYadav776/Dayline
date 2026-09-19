@@ -65,3 +65,14 @@ PRD and every resolved ambiguity lands here.
 - **Context:** a malformed source line like `- [ ]text` (no space) parses; Obsidian only renders checkboxes with `] `.
 - **Decision:** when a line is (re-)serialized because it was edited, gap defaults to a single space; untouched lines are never re-rendered, so user bytes survive verbatim.
 - **Consequence:** edits silently fix malformed checkboxes instead of writing broken Markdown; round-trip of unmodified notes is unaffected (property-tested).
+
+## D-013 · Today sections exposed as row-dict lists, not a QAbstractListModel (M2)
+- **Context:** PRD §6.4 suggests "QML lists use models with stable roles". A `QAbstractListModel` subclass was built first. PySide6 cannot register a model-typed `Property` (metaobject rejects `QAbstractListModel*`), and a custom-component Repeater delegate with `required property` role bindings silently created 0 delegates (only a plain-`Item` delegate worked), costing significant debugging.
+- **Options:** (a) context-property the model + ListView (heavy nesting in a scroll page); (b) keep model, use inline `Item` delegates (loses the reusable TaskRow component); (c) expose each section as a plain `list[dict]` via a pure `task_to_row` mapper and bind `Repeater { model: vm.todoList; delegate: TaskRow { required property var modelData } }`.
+- **Decision:** (c). Row dicts are rebuilt and the `changed` signal re-fires on every reload; lists are small (≤ a few hundred).
+- **Consequence:** Reliable rendering, a genuinely reusable TaskRow, and a Qt-free `task_model.task_to_row` mapper that is unit-testable. A real `QAbstractItemModel` can be reintroduced in M4 for the Week page's larger virtualised grid if profiling ever demands it. Verified by offscreen renders in both themes (scripts/screenshot_pages.py).
+
+## D-014 · Screenshot QA uses QWindow.grabWindow on the real platform (M2)
+- **Context:** Offscreen platform renders layout but lacks system fonts (tofu glyphs), so it can't validate typography/colour.
+- **Decision:** `scripts/screenshot_pages.py` renders via `QT_QPA_PLATFORM=windows` + `win.grabWindow()` for visual QA; CI keeps offscreen for the functional selftest.
+- **Consequence:** Both themes are visually verified on a real Windows box; CI stays headless.

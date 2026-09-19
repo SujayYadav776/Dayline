@@ -8,7 +8,8 @@ src/dayline/
 │               stats, moment_format, obsidian discovery, settings, clock
 ├─ platform/    Windows adapters behind interfaces (autostart, single instance,
 │               hotkey, notifications, tray, dwm, paths); fakes for tests
-├─ ui/viewmodels/  QObject + QAbstractListModel bridges (today, task model, week, settings)
+├─ ui/viewmodels/  QObject bridges (app, today); task_model.py is a pure
+│                  Task→row-dict mapper (D-013); week/settings added in M4
 ├─ ui/qml/      presentation only; Theme singleton in Dayline/qmldir (D-003)
 └─ app.py       bootstrap: args (--selftest/--minimized), engine, wiring
 ```
@@ -31,22 +32,27 @@ src/dayline/
 
 | FR | Module | Test | Status |
 |---|---|---|---|
-| FR-T1..T5 semantics (add/toggle/edit/priority/meta) | `core/model.py` | test_model, test_surgical | core ✅ (UI in M2/M3) |
-| FR-T3 children, FR-T9 subtasks | `core/model.py` (children_of, block ops) | test_model, test_surgical | core ✅ |
-| FR-T10 metadata chips data | `core/model.py` (split_description, tail) | test_model | core ✅ |
-| FR-D1/§5.2 counting rules | `core/stats.py` | test_stats | core ✅ |
-| FR-D4 stable priority sort data | `core/model.py` PRIO_RANK | — (VM in M3) | core ✅ |
+| FR-T1..T5 semantics (add/toggle/edit/priority/meta) | `core/model.py` | test_model, test_surgical | core ✅ (mutation UI in M3) |
+| FR-T3 children, FR-T9 subtasks | `core/model.py` (children_of, block ops) | test_model, test_surgical | core ✅; nested display ✅ (M2) |
+| FR-T10 metadata chips data | `core/model.py` + `ui/viewmodels/task_model.py` | test_model | ✅ (chips render M2) |
+| FR-D1/§5.2 counting + progress ring | `core/stats.py`, `today_vm`, `ProgressRing.qml` | test_stats, test_shell_smoke | ✅ |
+| FR-D2 day nav (Alt+←/→, Ctrl+T) | `app_vm` slots, `Main.qml` Shortcuts | test_shell_smoke | ✅ |
+| FR-D3 To do/Done/Carried sections | `today_vm` lists, `TodayPage.qml` | test_shell_smoke | ✅ |
+| FR-D4 stable priority sort | `today_vm._sort_key` | test_shell_smoke (todoList order) | ✅ |
+| FR-D5 empty/loading/error/vault-missing states | `TodayPage`, `VaultSetupView`, `EmptyState`, `SkeletonItem`, `ErrorBanner` | screenshot QA | ✅ |
+| FR-D6 "Carried over: N" chip | `today_vm.carriedOver`, `TodayPage` chip | test_shell_smoke | ✅ |
+| FR-P9 theme tokens | `Theme.qml` + `platform/system_theme.py` | screenshot QA (both themes) | ✅ (live OS watch in M5) |
 | FR-R1..R8 rollover | `core/rollover.py` | test_rollover (unit + 320-case properties) | ✅ |
 | FR-R5 logical day | `core/clock.py` | test_clock | ✅ |
-| FR-O1 vault discovery | `core/obsidian.py` find_vaults | test_obsidian | ✅ |
+| FR-O1 vault discovery | `core/obsidian.py` find_vaults | test_obsidian | ✅ (setup UI M2) |
 | FR-O2 daily-notes.json | `core/obsidian.py` read_daily_notes | test_obsidian | ✅ |
 | FR-O3 Moment subset | `core/moment_format.py` | test_moment_format | ✅ |
 | FR-O4/O7 section + round-trip | `core/parser.py`, `serializer.py` | test_roundtrip (2×1000 cases), test_surgical | ✅ |
-| FR-O6 open URI | `core/obsidian.py` open_uri | test_obsidian | ✅ |
-| FR-O9 legacy import | `core/settings.py` import_legacy_todo_config | test_settings | ✅ |
+| FR-O6 open URI | `core/obsidian.py` open_uri | test_obsidian | ✅ (button M3) |
+| FR-O9 legacy import | `core/settings.py` import_legacy_todo_config | test_settings | ✅ (Settings UI M4) |
 | FR-O10 conflict copies | `core/obsidian.py` is_conflict_copy | test_obsidian | ✅ |
 | §5.7 Store safe RMW + backups | `core/store.py` | test_store | ✅ |
 | §3.7 settings persistence | `core/settings.py` | test_settings | ✅ |
-| §5.9 wake/DST detection | `core/clock.py` detect_wake | test_clock | ✅ |
+| §5.9 wake/DST detection | `core/clock.py` detect_wake + `app_vm._on_tick` | test_clock | ✅ |
 
-Layers untouched in M1: `platform/` (paths only), `ui/` — they start in M2.
+Remaining: task mutation + undo + file-watch sync (M3); Week/Settings/Onboarding UI (M4); Windows integration (M5); hardening (M6); release (M7).
