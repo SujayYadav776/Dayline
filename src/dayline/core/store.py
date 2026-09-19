@@ -18,7 +18,7 @@ from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TypeVar, cast
 
 from dayline.core.errors import LockedFileError, NoteDecodeError
 from dayline.core.model import NoteDoc
@@ -26,6 +26,8 @@ from dayline.core.parser import empty_doc, parse_bytes
 from dayline.core.serializer import serialize
 
 log = logging.getLogger("dayline.core.store")
+
+_T = TypeVar("_T")
 
 _BACKOFF_S = (0.05, 0.1, 0.2, 0.4, 0.8)
 _MAX_LOOPS = 3
@@ -106,7 +108,7 @@ class Store:
             return self._locks[key]
 
     # -------------------------------------------------------------- mutate --
-    def mutate(self, d: date, fn: Callable[[NoteDoc], Any]) -> Any:
+    def mutate(self, d: date, fn: Callable[[NoteDoc], _T]) -> _T | None:
         """Fresh read → fn → surgical write. `fn` returning None/False skips the
         write (no-op rollover days etc). Returns fn's result or None."""
         with self._lock_for(d):
@@ -114,10 +116,10 @@ class Store:
                 outcome = self._mutate_once(d, fn)
                 if outcome is _RETRY:
                     continue
-                return outcome
+                return cast("_T | None", outcome)
             raise _retry_exhausted(self.path_for(d))
 
-    def _mutate_once(self, d: date, fn: Callable[[NoteDoc], Any]) -> Any:
+    def _mutate_once(self, d: date, fn: Callable[[NoteDoc], _T]) -> object:
         path = self.path_for(d)
         before_state = stat_state(path)
         doc = self.read_doc(d)
@@ -222,3 +224,16 @@ class Store:
 
     def forget_own_write(self, path: Path) -> None:
         self._own_writes.pop(path, None)
+
+    def write_bytes(self, path: Path, payload: bytes) -> None:
+        """Atomic raw write (undo/redo). Records the own-write signature so the
+        watcher ignores it. No read-modify-write: caller owns the exact bytes."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._backup(path)
+        tmp = self._write_temp(path, payload)
+        try:
+            self._replace(tmp, path)
+        except OSError:
+            self._cleanup_temp(path, tmp)
+            raise
+        self._remember_write(path, payload)
