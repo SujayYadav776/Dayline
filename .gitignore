@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage.xml
+.coverage
+htmlcov/
+
+# Build outputs
+build/
+dist/
+*.tmp
+
+# OS
+Thumbs.db
+Desktop.ini
+packaging/version_info.txt
