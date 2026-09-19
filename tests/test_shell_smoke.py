@@ -94,8 +94,9 @@ def test_empty_day_state(tmp_path: Path, qtbot: Any) -> None:
 
     vault = tmp_path / "vault"
     (vault / "Daily").mkdir(parents=True)
-    vm = AppViewModel(Settings(vault_path=str(vault), rollover_enabled=False),
-                      theme_probe=lambda: "light")
+    vm = AppViewModel(
+        Settings(vault_path=str(vault), rollover_enabled=False), theme_probe=lambda: "light"
+    )
     any_vm: Any = vm
     any_vm.start()
     qtbot.waitUntil(lambda: not any_vm.today._loading, timeout=2000)
