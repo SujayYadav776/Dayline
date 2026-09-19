@@ -27,8 +27,26 @@ src/dayline/
   stats cached by `(path, mtime_ns, size)`. `QThreadPool` behind the same
   interface only if profiling shows jank.
 
-## Requirement traceability (FR → module → test) — filled during M1–M5
+## Requirement traceability (FR → module → test)
 
 | FR | Module | Test | Status |
 |---|---|---|---|
-| — | — | — | not yet implemented |
+| FR-T1..T5 semantics (add/toggle/edit/priority/meta) | `core/model.py` | test_model, test_surgical | core ✅ (UI in M2/M3) |
+| FR-T3 children, FR-T9 subtasks | `core/model.py` (children_of, block ops) | test_model, test_surgical | core ✅ |
+| FR-T10 metadata chips data | `core/model.py` (split_description, tail) | test_model | core ✅ |
+| FR-D1/§5.2 counting rules | `core/stats.py` | test_stats | core ✅ |
+| FR-D4 stable priority sort data | `core/model.py` PRIO_RANK | — (VM in M3) | core ✅ |
+| FR-R1..R8 rollover | `core/rollover.py` | test_rollover (unit + 320-case properties) | ✅ |
+| FR-R5 logical day | `core/clock.py` | test_clock | ✅ |
+| FR-O1 vault discovery | `core/obsidian.py` find_vaults | test_obsidian | ✅ |
+| FR-O2 daily-notes.json | `core/obsidian.py` read_daily_notes | test_obsidian | ✅ |
+| FR-O3 Moment subset | `core/moment_format.py` | test_moment_format | ✅ |
+| FR-O4/O7 section + round-trip | `core/parser.py`, `serializer.py` | test_roundtrip (2×1000 cases), test_surgical | ✅ |
+| FR-O6 open URI | `core/obsidian.py` open_uri | test_obsidian | ✅ |
+| FR-O9 legacy import | `core/settings.py` import_legacy_todo_config | test_settings | ✅ |
+| FR-O10 conflict copies | `core/obsidian.py` is_conflict_copy | test_obsidian | ✅ |
+| §5.7 Store safe RMW + backups | `core/store.py` | test_store | ✅ |
+| §3.7 settings persistence | `core/settings.py` | test_settings | ✅ |
+| §5.9 wake/DST detection | `core/clock.py` detect_wake | test_clock | ✅ |
+
+Layers untouched in M1: `platform/` (paths only), `ui/` — they start in M2.

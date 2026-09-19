@@ -50,3 +50,18 @@ PRD and every resolved ambiguity lands here.
 - **Context:** PRD §4.2 lists priority light colors and "slightly lighter equivalents (AA on surface)" for dark.
 - **Decision:** Material-400 values `#EF5350` / `#FFB74D` / `#64B5F6`.
 - **Consequence:** AA contrast on `#1F2024`/`#26282D` surfaces holds (verified visually in M2 screenshot pass).
+
+## D-010 · Rollover writes: copies before source marks (M1)
+- **Context:** PRD §5.5 lists marking inline while scanning; a crash between phases must never hide a task.
+- **Decision:** two-phase write — append copies to today FIRST, then mark sources `>`. A crash in between can duplicate (dedupe suppresses next run), never lose.
+- **Consequence:** FR-R1..R8 hold; idempotence proven by 320-case property test.
+
+## D-011 · Moment unsupported-token detection = token letters only (M1)
+- **Context:** §5.4 wants warnings for unsupported tokens, but Obsidian formats also contain plain words ("Week of").
+- **Decision:** flag letters that are real Moment format tokens outside []-escapes (GgQqYwWEaAHkKmsSXZod); non-token letters pass through as literals, exactly like Moment itself does. `[literal stays]`-style escaping remains the correct way to hold token letters verbatim.
+- **Consequence:** `gggg-[W]ww`, `HH:mm` warn; `YYYY年MM月DD日` works; UI shows warning + `YYYY-MM-DD` fallback per FR-O3.
+
+## D-012 · Dirty-line re-render normalizes `]`+space (M1)
+- **Context:** a malformed source line like `- [ ]text` (no space) parses; Obsidian only renders checkboxes with `] `.
+- **Decision:** when a line is (re-)serialized because it was edited, gap defaults to a single space; untouched lines are never re-rendered, so user bytes survive verbatim.
+- **Consequence:** edits silently fix malformed checkboxes instead of writing broken Markdown; round-trip of unmodified notes is unaffected (property-tested).
