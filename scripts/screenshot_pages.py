@@ -103,12 +103,24 @@ def main() -> int:
                 ),
             )
         )
-        results.append(("vault-setup", capture(app, Settings(), outdir / "vault-setup.png")))
+        results.append(("onboarding", capture(app, Settings(), outdir / "onboarding.png")))
+        results.append(
+            (
+                "recovery",
+                capture(
+                    app,
+                    Settings(vault_path=str(Path(td) / "gone")),
+                    outdir / "recovery.png",
+                ),
+            )
+        )
         results.append(
             (
                 "week",
                 capture(
-                    app, vs(theme="light"), outdir / "week.png",
+                    app,
+                    vs(theme="light"),
+                    outdir / "week.png",
                     prepare=lambda vm: vm.setPage("week"),
                 ),
             )
@@ -117,7 +129,9 @@ def main() -> int:
             (
                 "settings",
                 capture(
-                    app, vs(theme="light"), outdir / "settings.png",
+                    app,
+                    vs(theme="light"),
+                    outdir / "settings.png",
                     prepare=lambda vm: vm.setPage("settings"),
                 ),
             )

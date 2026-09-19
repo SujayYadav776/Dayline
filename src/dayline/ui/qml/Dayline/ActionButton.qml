@@ -7,6 +7,8 @@ Rectangle {
     signal clicked()
     property bool hovered: mouse.containsMouse
     property bool pressed: mouse.pressed
+    property bool enabled: true
+    opacity: enabled ? 1.0 : 0.5
 
     width: label.implicitWidth + 2 * Theme.s16
     height: 34
@@ -30,7 +32,7 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: btn.clicked()
+        onClicked: if (btn.enabled) btn.clicked()
     }
     Accessible.role: Accessible.Button
     Accessible.name: btn.text

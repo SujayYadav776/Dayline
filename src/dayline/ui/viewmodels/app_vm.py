@@ -92,6 +92,11 @@ class AppViewModel(QObject):
     vaultReady = Property(
         bool, lambda self: self.store is not None and not self._force_setup, notify=changed
     )
+    firstRun = Property(
+        bool,
+        lambda self: self.store is None and not self.settings.vault_path,
+        notify=changed,
+    )
 
     todayVM = Property(QObject, lambda self: self.today, notify=changed)
     weekVM = Property(QObject, lambda self: self.week, notify=changed)

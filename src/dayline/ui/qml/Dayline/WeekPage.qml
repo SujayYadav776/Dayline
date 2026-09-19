@@ -180,6 +180,48 @@ Item {
                 }
             }
         }
+
+        // ---- month heat-map (FR-W3) ----------------------------------------
+        Column {
+            width: parent.width
+            spacing: Theme.s8
+            Text {
+                text: "This month"
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.captionPx
+            }
+            Grid {
+                id: heat
+                width: parent.width
+                columns: 7
+                spacing: Theme.s4
+                Repeater {
+                    model: page.vm.monthHeat
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: (heat.width - 6 * heat.spacing) / 7
+                        height: width
+                        radius: 4
+                        visible: !modelData.empty
+                        color: modelData.hasTasks
+                               ? Qt.alpha(Theme.accent, 0.15 + 0.85 * modelData.percent / 100)
+                               : Theme.surfaceAlt
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.day
+                            color: modelData.percent > 55 ? Theme.onAccent : Theme.textSecondary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.captionPx
+                        }
+                        ToolTip.visible: hh.containsMouse
+                        ToolTip.text: modelData.dateStr + " · " + modelData.percent + "%"
+                        HoverHandler { id: hh }
+                        Accessible.name: modelData.dateStr + ", " + modelData.percent + " percent"
+                    }
+                }
+            }
+        }
     }
 
     Accessible.name: "Week overview"

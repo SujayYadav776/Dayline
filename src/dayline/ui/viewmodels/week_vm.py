@@ -28,6 +28,7 @@ class WeekViewModel(QObject):
         self._week_done = 0
         self._week_total = 0
         self._title = ""
+        self._month_heat: list[dict[str, Any]] = []
 
     def bind(self, store: Store, *, week_start: str, now_provider: Any) -> None:
         self._store = store
@@ -46,6 +47,7 @@ class WeekViewModel(QObject):
         notify=changed,
     )
     rangeLabel = Property(str, lambda self: self._title, notify=changed)
+    monthHeat = Property(list, lambda self: self._month_heat, notify=changed)
 
     # -- navigation -----------------------------------------------------------
     def _week_start_date(self, anchor: date) -> date:
@@ -79,7 +81,34 @@ class WeekViewModel(QObject):
         self._week_done = done
         self._week_total = total
         self._title = f"{start:%d %b} – {start + timedelta(days=6):%d %b %Y}"
+        self._month_heat = self._build_month_heat()
         self.changed.emit()
+
+    def _build_month_heat(self) -> list[dict[str, Any]]:
+        """FR-W3: month grid cells for a 7-column heat-map (leading blanks align
+        day 1 under its weekday; each real cell carries completion %)."""
+        import calendar
+
+        if self._stats is None:
+            return []
+        y, m = self._anchor.year, self._anchor.month
+        first = date(y, m, 1)
+        ndays = calendar.monthrange(y, m)[1]
+        offset = (first.weekday() - _WEEKDAY[self._week_start]) % 7
+        cells: list[dict[str, Any]] = [{"empty": True} for _ in range(offset)]
+        for i in range(ndays):
+            d = first + timedelta(days=i)
+            st = self._stats.day(d)
+            cells.append(
+                {
+                    "empty": False,
+                    "dateStr": d.isoformat(),
+                    "day": d.day,
+                    "percent": st.percent,
+                    "hasTasks": st.total > 0,
+                }
+            )
+        return cells
 
     def invalidate(self) -> None:
         if self._stats is not None:

@@ -59,4 +59,11 @@ src/dayline/
 | §3.7 settings persistence | `core/settings.py` | test_settings | ✅ |
 | §5.9 wake/DST detection | `core/clock.py` detect_wake + `app_vm._on_tick` | test_clock | ✅ |
 
-Remaining: Week/Settings/Onboarding UI + "Open in Obsidian" (M4); Windows integration (M5); hardening (M6); release (M7).
+| FR-W1/W2 week rows + click-to-day | `ui/viewmodels/week_vm.py`, `WeekPage.qml` | test_week_settings_vm | ✅ |
+| FR-W3 month heat-map | `week_vm.monthHeat`, `WeekPage` Grid | test_week_settings_vm | ✅ |
+| FR-W5 cached stats ≤200ms | `core/stats.py` StatsService | test_stats | ✅ |
+| §3.7 Settings live-apply | `ui/viewmodels/settings_vm.py`, `SettingsPage.qml` | test_week_settings_vm | ✅ |
+| §3.8 Onboarding wizard | `Onboarding.qml`, `app_vm.firstRun` | screenshot QA | ✅ |
+| FR-O9 legacy import | `settings_vm.importLegacy` | test_week_settings_vm | ✅ |
+
+Remaining: Windows integration (M5); hardening (M6); "Open in Obsidian" button + release (M7).

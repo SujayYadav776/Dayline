@@ -8,6 +8,7 @@ Chip 1.0 Chip.qml
 EmptyState 1.0 EmptyState.qml
 ErrorBanner 1.0 ErrorBanner.qml
 Labeled 1.0 Labeled.qml
+Onboarding 1.0 Onboarding.qml
 ProgressRing 1.0 ProgressRing.qml
 SectionHeader 1.0 SectionHeader.qml
 SettingRow 1.0 SettingRow.qml

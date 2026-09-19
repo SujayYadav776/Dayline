@@ -89,7 +89,16 @@ ApplicationWindow {
         anchors.margins: Theme.s16
         visible: !App.vaultReady
         active: !App.vaultReady
-        sourceComponent: VaultSetupView { app: App }
+        sourceComponent: App.firstRun ? onboardingComp : setupComp
+    }
+
+    Component {
+        id: onboardingComp
+        Onboarding { app: App }
+    }
+    Component {
+        id: setupComp
+        VaultSetupView { app: App }
     }
 
     function pageCompFor(name) {

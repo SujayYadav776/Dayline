@@ -65,6 +65,7 @@ class SettingsViewModel(QObject):
     closeToTray = Property(bool, lambda self: self._s.close_to_tray, notify=changed)
     autostart = Property(bool, lambda self: self._s.autostart, notify=changed)
     hotkey = Property(str, lambda self: self._s.hotkey, notify=changed)
+    quickAddEnabled = Property(bool, lambda self: self._s.quick_add_enabled, notify=changed)
     notificationsEnabled = Property(
         bool, lambda self: self._s.notifications_enabled, notify=changed
     )
@@ -130,6 +131,10 @@ class SettingsViewModel(QObject):
     @Slot(str)
     def setHotkey(self, value: str) -> None:
         self._set("hotkey", value, "general")
+
+    @Slot(bool)
+    def setQuickAddEnabled(self, value: bool) -> None:
+        self._set("quick_add_enabled", value, "general")
 
     @Slot(bool)
     def setNotificationsEnabled(self, value: bool) -> None:
