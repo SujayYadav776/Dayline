@@ -104,6 +104,24 @@ def main() -> int:
             )
         )
         results.append(("vault-setup", capture(app, Settings(), outdir / "vault-setup.png")))
+        results.append(
+            (
+                "week",
+                capture(
+                    app, vs(theme="light"), outdir / "week.png",
+                    prepare=lambda vm: vm.setPage("week"),
+                ),
+            )
+        )
+        results.append(
+            (
+                "settings",
+                capture(
+                    app, vs(theme="light"), outdir / "settings.png",
+                    prepare=lambda vm: vm.setPage("settings"),
+                ),
+            )
+        )
     bad = [n for n, ok in results if not ok]
     for name, ok in results:
         print(f"{'OK  ' if ok else 'FAIL'} {name}")

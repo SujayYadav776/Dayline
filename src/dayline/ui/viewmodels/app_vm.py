@@ -29,7 +29,9 @@ from dayline.core.watcher import ChangeDetector
 from dayline.platform.paths import obsidian_json
 from dayline.platform.system_theme import make_theme_source
 from dayline.ui.sync import FileSync
+from dayline.ui.viewmodels.settings_vm import SettingsViewModel
 from dayline.ui.viewmodels.today_vm import TodayViewModel
+from dayline.ui.viewmodels.week_vm import WeekViewModel
 
 log = logging.getLogger("dayline.ui.app_vm")
 
@@ -58,6 +60,7 @@ class AppViewModel(QObject):
         self._theme_source = make_theme_source(settings.theme, theme_probe)
         self._page = PAGE_TODAY
         self._error = ""
+        self._force_setup = False
         self._day_start_min = _safe_day_start(settings.day_start)
         self._last_wall: float | None = None
         self._last_mono: float | None = None
@@ -66,6 +69,12 @@ class AppViewModel(QObject):
         self.today.nextDayRequested.connect(self.nextDay)
         self.today.goTodayRequested.connect(self.goToday)
         self.today.retryRequested.connect(self.retry)
+        self.week = WeekViewModel(self)
+        self.week.dayRequested.connect(self._openDayFromWeek)
+        self._settings_vm = SettingsViewModel(
+            settings, config_path, on_reload=self.start, parent=self
+        )
+        self._settings_vm.applied.connect(self._on_settings_applied)
         self.editor: TaskEditor | None = None
         self._detector: ChangeDetector | None = None
         self._sync: FileSync | None = None
@@ -80,9 +89,76 @@ class AppViewModel(QObject):
     page = Property(str, _page_get, notify=pageChanged)
     dark = Property(bool, lambda self: self._theme_source() == "dark", notify=changed)
     errorText = Property(str, lambda self: self._error, notify=changed)
-    vaultReady = Property(bool, lambda self: self.store is not None, notify=changed)
+    vaultReady = Property(
+        bool, lambda self: self.store is not None and not self._force_setup, notify=changed
+    )
 
     todayVM = Property(QObject, lambda self: self.today, notify=changed)
+    weekVM = Property(QObject, lambda self: self.week, notify=changed)
+    settingsVM = Property(QObject, lambda self: self._settings_vm, notify=changed)
+
+    @Slot()
+    def goWeek(self) -> None:
+        self._set_page("week")
+
+    @Slot()
+    def goSettings(self) -> None:
+        self._set_page("settings")
+
+    @Slot(str)
+    def setPage(self, name: str) -> None:
+        self._set_page(name)
+
+    @Slot()
+    def goSetup(self) -> None:
+        """Force the vault chooser (Change vault…) even when a vault is set."""
+        self._force_setup = True
+        self.changed.emit()
+
+    @Slot()
+    def runRolloverNow(self) -> None:
+        if self.store is None:
+            return
+        try:
+            res = rollover(self.store, self._logical_today(), self.settings.lookback)
+            self.today.set_carried_over(res.moved)
+            self._reload()
+        except DaylineError as exc:
+            self._error = str(exc)
+        self.changed.emit()
+
+    def _set_page(self, name: str) -> None:
+        self._page = name
+        if name == "week" and self.store is not None:
+            self.week.invalidate()
+        self.pageChanged.emit()
+
+    def _openDayFromWeek(self, d: date) -> None:
+        self.navigate(d)
+        self._set_page(PAGE_TODAY)
+
+    def _on_settings_applied(self, group: str) -> None:
+        if group == "appearance":
+            self.changed.emit()  # theme/sort/week-start live
+            if self.store is not None:
+                self.week.bind(
+                    self.store,
+                    week_start=self.settings.week_start,
+                    now_provider=datetime.now,
+                )
+                self._reload()
+        elif group == "rollover":
+            self._day_start_min = _safe_day_start(self.settings.day_start)
+            if self.settings.rollover_enabled and self.store is not None:
+                try:
+                    res = rollover(self.store, self._logical_today(), self.settings.lookback)
+                    self.today.set_carried_over(res.moved)
+                    self._reload()
+                except DaylineError as exc:
+                    self._error = str(exc)
+            self.changed.emit()
+        else:
+            self.changed.emit()
 
     @Property(list, notify=changed)
     def detectedVaults(self) -> list[dict[str, Any]]:
@@ -98,6 +174,10 @@ class AppViewModel(QObject):
         self._teardown_sync()
         self._error = ""
         self.store = self._make_store()
+        if self.store is not None:
+            self._force_setup = False
+            self._page = PAGE_TODAY
+            self.pageChanged.emit()
         self.changed.emit()
         if self.store is None:
             return
@@ -117,6 +197,7 @@ class AppViewModel(QObject):
                 self.changed.emit()
         self.navigate(today)
         self._start_sync(today)
+        self.week.bind(self.store, week_start=s.week_start, now_provider=datetime.now)
         self._tick.start()
 
     def _teardown_sync(self) -> None:
@@ -298,6 +379,8 @@ class AppViewModel(QObject):
 
     def _reload(self) -> None:
         self._load_day(self.today.current_date)
+        if self.store is not None:
+            self.week.invalidate()
 
     def _on_external_change(self, d: date) -> None:
         if d == self.today.current_date:

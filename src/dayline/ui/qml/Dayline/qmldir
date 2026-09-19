@@ -2,12 +2,18 @@
 # no hard-coded colours elsewhere. (qmldir comments use '#'.)
 module Dayline
 singleton Theme 1.0 Theme.qml
+ActionButton 1.0 ActionButton.qml
+Card 1.0 Card.qml
 Chip 1.0 Chip.qml
 EmptyState 1.0 EmptyState.qml
 ErrorBanner 1.0 ErrorBanner.qml
+Labeled 1.0 Labeled.qml
 ProgressRing 1.0 ProgressRing.qml
 SectionHeader 1.0 SectionHeader.qml
+SettingRow 1.0 SettingRow.qml
+SettingsPage 1.0 SettingsPage.qml
 SkeletonItem 1.0 SkeletonItem.qml
 TaskRow 1.0 TaskRow.qml
 TodayPage 1.0 TodayPage.qml
 VaultSetupView 1.0 VaultSetupView.qml
+WeekPage 1.0 WeekPage.qml
