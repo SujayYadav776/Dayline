@@ -13,7 +13,9 @@ from typing import Any
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
 from dayline.core.clock import detect_wake, logical_date, parse_day_start_minutes
+from dayline.core.editor import StaleEditError, TaskEditor
 from dayline.core.errors import DaylineError, NoteDecodeError
+from dayline.core.model import Priority
 from dayline.core.obsidian import (
     DailyNotesSettings,
     find_vaults,
@@ -23,13 +25,16 @@ from dayline.core.obsidian import (
 from dayline.core.rollover import rollover
 from dayline.core.settings import Settings, save
 from dayline.core.store import Store
+from dayline.core.watcher import ChangeDetector
 from dayline.platform.paths import obsidian_json
 from dayline.platform.system_theme import make_theme_source
+from dayline.ui.sync import FileSync
 from dayline.ui.viewmodels.today_vm import TodayViewModel
 
 log = logging.getLogger("dayline.ui.app_vm")
 
 PAGE_TODAY = "today"
+_PRIORITY_FROM_LABEL = {"high": Priority.HIGH, "medium": Priority.MEDIUM, "low": Priority.LOW}
 
 
 class AppViewModel(QObject):
@@ -61,6 +66,9 @@ class AppViewModel(QObject):
         self.today.nextDayRequested.connect(self.nextDay)
         self.today.goTodayRequested.connect(self.goToday)
         self.today.retryRequested.connect(self.retry)
+        self.editor: TaskEditor | None = None
+        self._detector: ChangeDetector | None = None
+        self._sync: FileSync | None = None
         self._tick = QTimer(self)
         self._tick.setInterval(30_000)
         self._tick.timeout.connect(self._on_tick)
@@ -87,11 +95,16 @@ class AppViewModel(QObject):
     def start(self) -> None:
         """Build the store from settings, run startup rollover, load logical today."""
         self._tick.stop()
+        self._teardown_sync()
         self._error = ""
         self.store = self._make_store()
         self.changed.emit()
         if self.store is None:
             return
+        self.editor = TaskEditor(self.store)
+        self._detector = ChangeDetector(self.store)
+        self._sync = FileSync(self._detector)
+        self._sync.dayChanged.connect(self._on_external_change)
         s = self.settings
         today = self._logical_today()
         if s.rollover_enabled:
@@ -103,7 +116,28 @@ class AppViewModel(QObject):
                 self._error = str(exc)
                 self.changed.emit()
         self.navigate(today)
+        self._start_sync(today)
         self._tick.start()
+
+    def _teardown_sync(self) -> None:
+        if self._sync is not None:
+            self._sync.stop()
+            self._sync.deleteLater()
+            self._sync = None
+        self._detector = None
+        self.editor = None
+
+    def _start_sync(self, today: date) -> None:
+        if self.store is None or self._sync is None:
+            return
+        folder = self.store.path_for(today).parent
+        self._sync.watch(folder, self._watched_dates(today))
+        self._sync.start()
+
+    def _watched_dates(self, today: date) -> list[date]:
+        """Notes we care about: the viewed day + the rollover lookback window."""
+        span = range(-1, min(self.settings.lookback, 90) + 1)
+        return [today - timedelta(days=n) for n in span]
 
     def _make_store(self) -> Store | None:
         s = self.settings
@@ -195,6 +229,79 @@ class AppViewModel(QObject):
                 log.warning("wake rollover failed: %s", exc)
         if self.today.is_today or woke:
             self.navigate(today)
+
+    # -- mutation actions (QML) -------------------------------------------------
+    canUndo = Property(
+        bool, lambda self: bool(self.editor and self.editor.undo_stack.can_undo), notify=changed
+    )
+    canRedo = Property(
+        bool, lambda self: bool(self.editor and self.editor.undo_stack.can_redo), notify=changed
+    )
+
+    def _act(self, label: str, run: Callable[[], object]) -> None:
+        if self.editor is None:
+            return
+        try:
+            run()
+        except StaleEditError:
+            log.info("%s hit a stale task; reloading", label)
+        except DaylineError as exc:
+            self._error = str(exc)
+        self._reload()
+        self.changed.emit()
+
+    @Slot(str)
+    def addTask(self, text: str) -> None:
+        d = self.today.current_date
+        self._act("add", lambda: self.editor and self.editor.add(d, text))
+
+    @Slot(int)
+    def toggleTask(self, key: int) -> None:
+        d = self.today.current_date
+        self._act("toggle", lambda: self.editor and self.editor.toggle(d, key))
+
+    @Slot(int, str)
+    def editTask(self, key: int, text: str) -> None:
+        d = self.today.current_date
+        self._act("edit", lambda: self.editor and self.editor.edit_text(d, key, text))
+
+    @Slot(int, str)
+    def setPriority(self, key: int, level: str) -> None:
+        d = self.today.current_date
+        prio = _PRIORITY_FROM_LABEL.get(level.lower())
+        self._act("priority", lambda: self.editor and self.editor.set_priority(d, key, prio))
+
+    @Slot(int)
+    def deleteTask(self, key: int) -> None:
+        d = self.today.current_date
+        self._act("delete", lambda: self.editor and self.editor.delete(d, key))
+
+    @Slot(int, int)
+    def moveTask(self, key: int, before_key: int) -> None:
+        d = self.today.current_date
+        before = None if before_key < 0 else before_key
+        self._act("move", lambda: self.editor and self.editor.move(d, key, before))
+
+    @Slot()
+    def undo(self) -> None:
+        if self.editor:
+            self.editor.undo()
+            self._reload()
+            self.changed.emit()
+
+    @Slot()
+    def redo(self) -> None:
+        if self.editor:
+            self.editor.redo()
+            self._reload()
+            self.changed.emit()
+
+    def _reload(self) -> None:
+        self._load_day(self.today.current_date)
+
+    def _on_external_change(self, d: date) -> None:
+        if d == self.today.current_date:
+            self._reload()
 
 
 def _safe_day_start(text: str) -> int:

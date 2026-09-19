@@ -60,4 +60,20 @@ ApplicationWindow {
         sequence: "Ctrl+R"
         onActivated: App.retry()
     }
+    Shortcut {
+        sequence: "Ctrl+N"
+        onActivated: if (pageLoader.item && pageLoader.item.focusAdd) pageLoader.item.focusAdd()
+    }
+    Shortcut {
+        sequence: "Ctrl+Z"
+        onActivated: App.undo()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+Z"
+        onActivated: App.redo()
+    }
+    Shortcut {
+        sequence: "Ctrl+Y"
+        onActivated: App.redo()
+    }
 }
