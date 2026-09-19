@@ -45,6 +45,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+# Obsidian Tasks tokens ARE emoji; unicode-lookalike warnings are noise here
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 "packaging/*.spec" = ["ALL"]
