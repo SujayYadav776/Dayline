@@ -32,9 +32,12 @@ src/dayline/
 
 | FR | Module | Test | Status |
 |---|---|---|---|
-| FR-T1..T5 semantics (add/toggle/edit/priority/meta) | `core/model.py` | test_model, test_surgical | core ✅ (mutation UI in M3) |
-| FR-T3 children, FR-T9 subtasks | `core/model.py` (children_of, block ops) | test_model, test_surgical | core ✅; nested display ✅ (M2) |
-| FR-T10 metadata chips data | `core/model.py` + `ui/viewmodels/task_model.py` | test_model | ✅ (chips render M2) |
+| FR-T1..T5 add/toggle/edit/priority/meta | `core/model.py`, `core/editor.py`, `TaskRow.qml`, `app_vm` slots | test_editor, test_actions | ✅ |
+| FR-T3 children, FR-T9 subtasks | `core/model.py` (children_of, block ops) | test_model, test_surgical | ✅ |
+| FR-T6 undo/redo (≥50) | `core/editor.py` UndoStack (snapshot) | test_editor | ✅ |
+| FR-T7 reorder | `editor.move`, Alt+↑/↓ shortcuts | test_actions | ✅ |
+| FR-T8 quick `!` syntax | `editor.parse_quick_syntax` | test_editor | ✅ |
+| FR-T10 metadata chips data | `core/model.py` + `ui/viewmodels/task_model.py` | test_model | ✅ |
 | FR-D1/§5.2 counting + progress ring | `core/stats.py`, `today_vm`, `ProgressRing.qml` | test_stats, test_shell_smoke | ✅ |
 | FR-D2 day nav (Alt+←/→, Ctrl+T) | `app_vm` slots, `Main.qml` Shortcuts | test_shell_smoke | ✅ |
 | FR-D3 To do/Done/Carried sections | `today_vm` lists, `TodayPage.qml` | test_shell_smoke | ✅ |
@@ -48,11 +51,12 @@ src/dayline/
 | FR-O2 daily-notes.json | `core/obsidian.py` read_daily_notes | test_obsidian | ✅ |
 | FR-O3 Moment subset | `core/moment_format.py` | test_moment_format | ✅ |
 | FR-O4/O7 section + round-trip | `core/parser.py`, `serializer.py` | test_roundtrip (2×1000 cases), test_surgical | ✅ |
-| FR-O6 open URI | `core/obsidian.py` open_uri | test_obsidian | ✅ (button M3) |
+| FR-O5 live two-way sync | `core/watcher.py`, `ui/sync.py` | test_watcher, test_actions | ✅ |
+| FR-O6 open URI | `core/obsidian.py` open_uri | test_obsidian | ✅ (button M4) |
 | FR-O9 legacy import | `core/settings.py` import_legacy_todo_config | test_settings | ✅ (Settings UI M4) |
 | FR-O10 conflict copies | `core/obsidian.py` is_conflict_copy | test_obsidian | ✅ |
 | §5.7 Store safe RMW + backups | `core/store.py` | test_store | ✅ |
 | §3.7 settings persistence | `core/settings.py` | test_settings | ✅ |
 | §5.9 wake/DST detection | `core/clock.py` detect_wake + `app_vm._on_tick` | test_clock | ✅ |
 
-Remaining: task mutation + undo + file-watch sync (M3); Week/Settings/Onboarding UI (M4); Windows integration (M5); hardening (M6); release (M7).
+Remaining: Week/Settings/Onboarding UI + "Open in Obsidian" (M4); Windows integration (M5); hardening (M6); release (M7).

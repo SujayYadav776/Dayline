@@ -76,3 +76,9 @@ PRD and every resolved ambiguity lands here.
 - **Context:** Offscreen platform renders layout but lacks system fonts (tofu glyphs), so it can't validate typography/colour.
 - **Decision:** `scripts/screenshot_pages.py` renders via `QT_QPA_PLATFORM=windows` + `win.grabWindow()` for visual QA; CI keeps offscreen for the functional selftest.
 - **Consequence:** Both themes are visually verified on a real Windows box; CI stays headless.
+
+
+## D-015 · Snapshot-based undo with a stale-write guard (M3)
+- **Context:** FR-T6 wants session undo/redo of add/edit/complete/delete/reorder/priority. Surgical edits make per-field inverses fiddly, and blind byte-restore could clobber a concurrent Obsidian edit.
+- **Decision:** each action records (path, existed_before, before_bytes, after_bytes). Undo/redo restores bytes only when the file currently equals the expected side; a mismatch (external edit since) makes the step a no-op rather than a clobber. Undoing a note the app *created* restores an empty managed section (never deletes a file).
+- **Consequence:** correct, safe, ≤100-step history; verified by test_editor (undo/redo, created-note, stale-skip) and test_actions (no self-reload loop).
