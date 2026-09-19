@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 from typing import cast
@@ -11,6 +12,10 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
+
+from dayline.core.settings import load as load_settings
+from dayline.platform.paths import config_file
+from dayline.ui.viewmodels.app_vm import AppViewModel
 
 APP_NAME = "Dayline"
 
@@ -25,15 +30,41 @@ def qml_dir() -> Path:
     return Path(__file__).parent / _QML_DIR_NAME
 
 
-def create_engine() -> QQmlApplicationEngine:
-    """Create the QML engine and load the main window. Caller must keep the
-    returned engine (and its root objects) alive for the lifetime of the UI."""
+def configure_logging() -> None:
+    from dayline.platform.paths import logs_dir
+
+    logs_dir().mkdir(parents=True, exist_ok=True)
+    from logging.handlers import RotatingFileHandler
+
+    handlers: list[logging.Handler] = [
+        RotatingFileHandler(
+            logs_dir() / "dayline.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+        )
+    ]
+    if sys.stderr is not None:  # windowed frozen builds have no console
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=handlers,
+    )
+
+
+def create_engine() -> tuple[QQmlApplicationEngine, AppViewModel]:
+    """Create the QML engine with the App context property set. The caller
+    must keep the returned engine and viewmodel alive for the UI lifetime."""
     QQuickStyle.setStyle("Basic")
+
+    cfg_path = config_file()
+    settings, _issues = load_settings(cfg_path)
+    vm = AppViewModel(settings, config_path=cfg_path)
+
     engine = QQmlApplicationEngine()
+    engine.rootContext().setContextProperty("App", vm)
     root = qml_dir()
     engine.addImportPath(str(root))
     engine.load(QUrl.fromLocalFile(str(root / "Main.qml")))
-    return engine
+    return engine, vm
 
 
 def _report(msg: str) -> None:
@@ -52,16 +83,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    configure_logging()
     app = cast("QGuiApplication", QGuiApplication.instance() or QGuiApplication(sys.argv))
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
+    app.setApplicationVersion(_version())
 
-    engine = create_engine()
+    engine, vm = create_engine()
     roots = engine.rootObjects()
     if not roots:
         _report("FATAL: failed to load QML UI")
         return 1
+    vm.start()
 
     if args.selftest:
         window = roots[0]
@@ -69,8 +103,13 @@ def main(argv: list[str] | None = None) -> int:
         _report(f"selftest: qml_loaded={'ok' if ok else 'failed'}")
         return 0 if ok else 1
 
-    # M2+: window/tray/scheduler wiring. M0 ends here with a plain event loop.
     return app.exec()
+
+
+def _version() -> str:
+    from dayline import __version__
+
+    return __version__
 
 
 if __name__ == "__main__":  # pragma: no cover

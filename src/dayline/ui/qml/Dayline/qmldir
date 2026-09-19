@@ -1,4 +1,13 @@
-# Dayline QML module. Drives all colors/metrics from the Theme singleton —
-# no hard-coded colours anywhere else.
+# Dayline QML module. All colors/metrics come from the Theme singleton —
+# no hard-coded colours elsewhere. (qmldir comments use '#'.)
 module Dayline
 singleton Theme 1.0 Theme.qml
+Chip 1.0 Chip.qml
+EmptyState 1.0 EmptyState.qml
+ErrorBanner 1.0 ErrorBanner.qml
+ProgressRing 1.0 ProgressRing.qml
+SectionHeader 1.0 SectionHeader.qml
+SkeletonItem 1.0 SkeletonItem.qml
+TaskRow 1.0 TaskRow.qml
+TodayPage 1.0 TodayPage.qml
+VaultSetupView 1.0 VaultSetupView.qml
