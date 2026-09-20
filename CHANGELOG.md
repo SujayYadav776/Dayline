@@ -2,6 +2,20 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-09-20
+
+### Added
+- **Opt-in update check.** Settings → Updates has an "Auto-check (daily)"
+  switch (default **off**) and a "Check now" button. When a newer GitHub
+  release is found it shows a tray toast + a Settings banner with **Install
+  update** (downloads the installer over https and runs it silently, force-
+  closing the running app) and **Release notes** (opens the release page).
+- Pure `core/updater.py` (version normalise/compare, release parsing, installer
+  asset pick, once-a-day scheduling) — network and disk I/O stay in
+  `platform/update_net.py` + `platform/installer.py`; the fetch runs on a
+  `QThread` so the UI never blocks. https-only with a GitHub host allowlist so
+  a tampered feed can't fetch a binary from an arbitrary origin.
+
 ## [1.1.1] — 2026-09-20
 
 ### Fixed

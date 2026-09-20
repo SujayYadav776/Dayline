@@ -76,6 +76,7 @@ src/dayline/
 | FR-P8 dark title bar | `platform/dwm.py` | smoke (no crash) | ✅ (visual: human) |
 | FR-P9 live theme | `system_theme.py`, `Main` Binding | screenshot QA | ✅ |
 | polish · Mica backdrop | `platform/dwm.py`, `app_vm.micaActive`, `Main` color | unit (build gate + probe) | ✅ (see-through: human, Win11) |
+| polish · update check (opt-in) | `core/updater`, `platform/update_net`+`installer`, `ui/update_service` | unit (parse/compare/guard/VM-thread) | ✅ (live fetch + silent upgrade: human, Win) |
 | FR-O6 open in Obsidian | `app_vm.openInObsidian` | unit (uri) | ✅ |
 
 | §6.5 crash hook + dialog | `ui/crash.py` | test_hardening | ✅ |

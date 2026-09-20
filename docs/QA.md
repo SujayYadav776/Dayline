@@ -32,5 +32,6 @@ Perform on the installed build (not dev tree) unless noted. Tick with date + bui
 - [ ] Autostart toggle writes/clears HKCU Run; after reboot Dayline starts minimized to tray
 - [ ] Dark title bar follows the theme live (DWM) on Win10 20H1+ and Win11
 - [ ] Mica backdrop: on Windows 11 the window shows a subtle translucent wallpaper blur behind the cards/margins (Settings → Appearance → "Mica backdrop" toggles it; off by default on Win10 where the toggle is hidden)
+- [ ] Updates (opt-in): with the repo public, Settings → Updates "Check now" reports the running version or a newer release; turning on "Auto-check (daily)" checks once at startup. "Install update" downloads over https and silently upgrades the running app (force-closes, then relaunches updated). Offline → "Couldn't check"; never falsely claims up-to-date.
 - [ ] Crash dialog: force an error → dialog appears with "Open logs folder"; logs contain no task text
 - [ ] 125/150/200% display scaling; light/dark switch while running

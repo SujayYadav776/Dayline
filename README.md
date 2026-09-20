@@ -51,6 +51,17 @@ winget install JRSoftware.InnoSetup
 # -> dist\installer\Dayline-Setup-1.0.0.exe  (per-user, no admin; never deletes user data)
 ```
 
+## Updates (opt-in)
+
+Dayline is private-by-default: it makes **no** network calls unless you enable
+them. Settings → Updates has an **"Auto-check (daily)"** switch (default **off**)
+and a **"Check now"** button. It reads the public GitHub
+`releases/latest` API for this repo (https-only, restricted to GitHub's hosts —
+no token is ever embedded in the shipped exe). When a newer release exists you
+get a tray toast + a banner with **Install update** (downloads the installer and
+upgrades silently) and **Release notes**. Turning the feature off restores the
+fully offline default.
+
 ## CI
 
 `.github/workflows/build.yml` runs on `windows-latest`: lint → type-check →
