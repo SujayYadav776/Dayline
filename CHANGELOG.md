@@ -2,7 +2,7 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] — 2026-09-20
 
 ### UI
 - Windows 11 **Mica** translucent backdrop, on by default. Gated to build
