@@ -176,11 +176,17 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
         app.installNativeEventFilter(qf)
         controller.bind_hotkey()
         controller._native_filter = qf  # keep alive
+
+    def _on_settings(group: str) -> None:
+        if group == "notifications":
+            controller.schedule_notifications()
+
     controller.apply_titlebar_theme()
     vm.changed.connect(controller.apply_titlebar_theme)
-    vm.changed.connect(controller.schedule_notifications)
+    vm.settingsVM.applied.connect(_on_settings)
     controller.schedule_notifications()
     controller.sync_autostart()
+    controller._settings_handler = _on_settings  # keep closure alive
     return controller
 
 

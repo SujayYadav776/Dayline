@@ -26,6 +26,7 @@ from dayline.core.rollover import rollover
 from dayline.core.settings import Settings, save
 from dayline.core.store import Store
 from dayline.core.watcher import ChangeDetector
+from dayline.platform.motion import make_motion_source
 from dayline.platform.paths import obsidian_json
 from dayline.platform.system_theme import make_theme_source
 from dayline.ui.sync import FileSync
@@ -51,6 +52,7 @@ class AppViewModel(QObject):
         *,
         config_path: Path | None = None,
         theme_probe: Callable[[], str] | None = None,
+        motion_probe: Callable[[], bool] | None = None,
         parent: Any = None,
     ) -> None:
         super().__init__(parent)
@@ -58,6 +60,7 @@ class AppViewModel(QObject):
         self.store: Store | None = None
         self._config_path = config_path
         self._theme_source = make_theme_source(settings.theme, theme_probe)
+        self._motion_source = make_motion_source(motion_probe)
         self._page = PAGE_TODAY
         self._error = ""
         self._force_setup = False
@@ -89,6 +92,7 @@ class AppViewModel(QObject):
 
     page = Property(str, _page_get, notify=pageChanged)
     dark = Property(bool, lambda self: self._theme_source() == "dark", notify=changed)
+    reduceMotion = Property(bool, lambda self: not self._motion_source(), notify=changed)
     errorText = Property(str, lambda self: self._error, notify=changed)
     vaultReady = Property(
         bool, lambda self: self.store is not None and not self._force_setup, notify=changed
@@ -133,8 +137,20 @@ class AppViewModel(QObject):
             self._error = str(exc)
         self.changed.emit()
 
+    # -- window geometry + last page (PRD §4.3) --------------------------------
+    geometry = Property(dict, lambda self: self.settings.window, notify=changed)
+
+    @Slot(int, int, int, int)
+    def saveGeometry(self, x: int, y: int, w: int, h: int) -> None:
+        self.settings.window = {"x": x, "y": y, "width": w, "height": h}
+        if self._config_path is not None:
+            save(self._config_path, self.settings)
+
     def _set_page(self, name: str) -> None:
         self._page = name
+        self.settings.last_page = name
+        if self._config_path is not None:
+            save(self._config_path, self.settings)
         if name == "week" and self.store is not None:
             self.week.invalidate()
         self.pageChanged.emit()
@@ -204,6 +220,8 @@ class AppViewModel(QObject):
         self.navigate(today)
         self._start_sync(today)
         self.week.bind(self.store, week_start=s.week_start, now_provider=datetime.now)
+        if s.last_page in (PAGE_TODAY, "week", "settings"):
+            self._page = s.last_page
         self._tick.start()
 
     def _teardown_sync(self) -> None:

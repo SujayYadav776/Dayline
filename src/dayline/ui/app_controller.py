@@ -47,19 +47,13 @@ class AppController(QObject):
         self._quit_app = quit_app
         self._quitting = False
         self._native_filter: Any = None
+        self._settings_handler: Any = None
         self._hotkey_ok = False
         self._notifiers: list[QTimer] = []
 
     # -- tray / close-to-tray --------------------------------------------------
-    def install_tray(self) -> None:
-        if self._tray is None or not self._tray.available():
-            return
-        self._tray.show(
-            tooltip="Dayline",
-        )
-
     def toggle_window(self) -> None:
-        if self._window.isVisible() and self._window.active:
+        if self._window.isVisible():
             self._window.hide()
         else:
             self._show_and_raise()
@@ -157,11 +151,14 @@ class AppController(QObject):
             target = now.replace(hour=minutes // 60, minute=minutes % 60, second=0, microsecond=0)
         first_ms = max(0, int((target - now).total_seconds() * 1000))
         timer = QTimer(self)
-        timer.timeout.connect(lambda: self._fire(kind))
         timer.setSingleShot(True)
+
+        def fire() -> None:
+            self._fire(kind)
+            timer.start(24 * 3600 * 1000)  # next day
+
+        timer.timeout.connect(fire)
         timer.start(first_ms)
-        # reschedule daily after first fire
-        timer.timeout.connect(lambda: timer.start(24 * 3600 * 1000))
         return timer
 
     def _fire(self, kind: str) -> None:
