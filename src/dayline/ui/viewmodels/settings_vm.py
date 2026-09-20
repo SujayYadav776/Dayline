@@ -62,6 +62,7 @@ class SettingsViewModel(QObject):
     theme = Property(str, lambda self: self._s.theme, notify=changed)
     sortMode = Property(str, lambda self: self._s.sort_mode, notify=changed)
     weekStart = Property(str, lambda self: self._s.week_start, notify=changed)
+    mica = Property(bool, lambda self: self._s.mica, notify=changed)
     closeToTray = Property(bool, lambda self: self._s.close_to_tray, notify=changed)
     autostart = Property(bool, lambda self: self._s.autostart, notify=changed)
     hotkey = Property(str, lambda self: self._s.hotkey, notify=changed)
@@ -119,6 +120,10 @@ class SettingsViewModel(QObject):
     @Slot(str)
     def setWeekStart(self, value: str) -> None:
         self._set("week_start", value, "appearance")
+
+    @Slot(bool)
+    def setMica(self, value: bool) -> None:
+        self._set("mica", value, "appearance")
 
     @Slot(bool)
     def setCloseToTray(self, value: bool) -> None:

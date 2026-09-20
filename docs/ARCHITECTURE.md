@@ -75,6 +75,7 @@ src/dayline/
 | FR-P7 notifications | `app_controller.schedule_notifications` | unit | ✅ |
 | FR-P8 dark title bar | `platform/dwm.py` | smoke (no crash) | ✅ (visual: human) |
 | FR-P9 live theme | `system_theme.py`, `Main` Binding | screenshot QA | ✅ |
+| polish · Mica backdrop | `platform/dwm.py`, `app_vm.micaActive`, `Main` color | unit (build gate + probe) | ✅ (see-through: human, Win11) |
 | FR-O6 open in Obsidian | `app_vm.openInObsidian` | unit (uri) | ✅ |
 
 | §6.5 crash hook + dialog | `ui/crash.py` | test_hardening | ✅ |

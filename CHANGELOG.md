@@ -2,6 +2,17 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### UI
+- Windows 11 **Mica** translucent backdrop, on by default. Gated to build
+  22000+ via `DWMWA_SYSTEMBACKDROP_TYPE`; the window requests an alpha surface
+  and tints `Theme.bg` at 80% opacity so the OS blur shows through the header,
+  list gaps and margins while cards stay solid. Falls back to the plain opaque
+  theme off Win11 (no `DwmExtendFrameIntoClientArea`, so no black-glass risk).
+- Settings → Appearance gains a "Mica backdrop" toggle (shown only where the OS
+  supports it). Persisted as `Settings.mica` (default `true`).
+
 ## [1.0.0] — 2026-09-20
 
 First production release. A Windows desktop to-do app that uses an Obsidian

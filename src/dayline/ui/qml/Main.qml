@@ -14,7 +14,11 @@ ApplicationWindow {
     minimumWidth: 360
     minimumHeight: 480
     title: "Dayline"
-    color: Theme.bg
+    // Mica backdrop: tint the window near-opaque but slightly translucent when
+    // active so the OS-composited blur shows through the page gaps; cards stay solid.
+    readonly property color windowTint:
+        App.micaActive ? Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.80) : Theme.bg
+    color: windowTint
 
     // Theme singleton follows the VM's dark flag live (OS watch in M5).
     Binding {

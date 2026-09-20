@@ -94,6 +94,16 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationDisplayName(APP_NAME)
     app.setApplicationVersion(_version())
 
+    # On Win11, request an alpha surface so the Mica backdrop can show through.
+    from dayline.platform.dwm import supports_system_backdrop
+
+    if supports_system_backdrop():  # pragma: no cover - platform capability
+        from PySide6.QtGui import QSurfaceFormat
+
+        fmt = QSurfaceFormat.defaultFormat()
+        fmt.setAlphaBufferSize(8)
+        QSurfaceFormat.setDefaultFormat(fmt)
+
     # single instance: a second launch asks the running one to show, then exits
     from dayline.platform.single_instance import SingleInstance
 
@@ -182,7 +192,9 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
             controller.schedule_notifications()
 
     controller.apply_titlebar_theme()
+    controller.apply_backdrop()
     vm.changed.connect(controller.apply_titlebar_theme)
+    vm.changed.connect(controller.apply_backdrop)
     vm.settingsVM.applied.connect(_on_settings)
     controller.schedule_notifications()
     controller.sync_autostart()

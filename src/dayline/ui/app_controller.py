@@ -94,6 +94,16 @@ class AppController(QObject):
             return
         set_dark_titlebar(hwnd, bool(self._vm.dark))
 
+    # -- Mica system backdrop --------------------------------------------------
+    def apply_backdrop(self) -> None:
+        from dayline.platform.dwm import set_mica_backdrop
+
+        try:
+            hwnd = int(self._window.winId())
+        except (AttributeError, TypeError):
+            return
+        set_mica_backdrop(hwnd, bool(self._vm.micaActive))
+
     # -- global hotkey ---------------------------------------------------------
     def bind_hotkey(self) -> bool:
         if self._hotkey is None:

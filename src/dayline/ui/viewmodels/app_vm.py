@@ -26,6 +26,7 @@ from dayline.core.rollover import rollover
 from dayline.core.settings import Settings, save
 from dayline.core.store import Store
 from dayline.core.watcher import ChangeDetector
+from dayline.platform.dwm import supports_system_backdrop
 from dayline.platform.motion import make_motion_source
 from dayline.platform.paths import obsidian_json
 from dayline.platform.system_theme import make_theme_source
@@ -53,6 +54,7 @@ class AppViewModel(QObject):
         config_path: Path | None = None,
         theme_probe: Callable[[], str] | None = None,
         motion_probe: Callable[[], bool] | None = None,
+        mica_probe: Callable[[], bool] | None = None,
         parent: Any = None,
     ) -> None:
         super().__init__(parent)
@@ -61,6 +63,7 @@ class AppViewModel(QObject):
         self._config_path = config_path
         self._theme_source = make_theme_source(settings.theme, theme_probe)
         self._motion_source = make_motion_source(motion_probe)
+        self._mica_source: Callable[[], bool] = mica_probe or supports_system_backdrop
         self._page = PAGE_TODAY
         self._error = ""
         self._force_setup = False
@@ -93,6 +96,12 @@ class AppViewModel(QObject):
     page = Property(str, _page_get, notify=pageChanged)
     dark = Property(bool, lambda self: self._theme_source() == "dark", notify=changed)
     reduceMotion = Property(bool, lambda self: not self._motion_source(), notify=changed)
+    # Mica is on only when the user enabled it AND the OS supports it (Win11).
+    micaActive = Property(
+        bool, lambda self: bool(self.settings.mica and self._mica_source()), notify=changed
+    )
+    # Pure OS capability (drives whether the Settings toggle is shown).
+    micaSupported = Property(bool, lambda self: bool(self._mica_source()), notify=changed)
     errorText = Property(str, lambda self: self._error, notify=changed)
     vaultReady = Property(
         bool, lambda self: self.store is not None and not self._force_setup, notify=changed

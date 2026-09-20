@@ -52,6 +52,17 @@ Item {
                     currentIndex: page.vm.weekStart === "sun" ? 1 : 0
                     onActivated: page.vm.setWeekStart(currentText === "Sunday" ? "sun" : "mon")
                 }
+                Row {
+                    width: parent.width
+                    visible: page.app && page.app.micaSupported
+                    SettingRow { label: "Mica backdrop"; width: parent.width - micw.width }
+                    Switch {
+                        id: micw
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.mica
+                        onToggled: page.vm.setMica(checked)
+                    }
+                }
             }
 
             // ---- Obsidian --------------------------------------------------

@@ -49,6 +49,7 @@ class Settings:
     sort_mode: str = "priority"  # priority|manual
     week_start: str = "mon"  # mon|sun
     reduce_motion: bool = False
+    mica: bool = True  # Win11 translucent Mica backdrop (no-op elsewhere)
     # Data hygiene
     backup_keep_days: int = 7
     # Window memory (FR §4.3)

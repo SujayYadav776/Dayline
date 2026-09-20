@@ -11,6 +11,7 @@ from dayline.platform.autostart import (
     FakeReg,
     command_for,
 )
+from dayline.platform.dwm import set_mica_backdrop, supports_system_backdrop
 from dayline.platform.hotkey import (
     MOD_ALT,
     MOD_CONTROL,
@@ -76,3 +77,19 @@ def test_global_hotkey_bind_fake_backend() -> None:
 def test_global_hotkey_conflict_returns_false() -> None:
     hk = GlobalHotkey(FakeBackend(ok=False))
     assert hk.bind("ctrl+alt+n", lambda: None) is False
+
+
+# ---- Mica backdrop ---------------------------------------------------------
+@pytest.mark.parametrize("build", [22000, 22621, 26200])
+def test_supports_system_backdrop_on_win11(build: int) -> None:
+    assert supports_system_backdrop(build) is True
+
+
+@pytest.mark.parametrize("build", [0, 19041, 19045, 21999])
+def test_supports_system_backdrop_off_win11(build: int) -> None:
+    assert supports_system_backdrop(build) is False
+
+
+def test_mica_backdrop_noop_without_hwnd() -> None:
+    assert set_mica_backdrop(0, True) is False
+    assert set_mica_backdrop(0, False) is False

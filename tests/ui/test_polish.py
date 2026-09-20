@@ -9,6 +9,7 @@ from typing import Any
 from dayline.core.settings import Settings, load
 from dayline.platform.motion import make_motion_source
 from dayline.ui.viewmodels.app_vm import AppViewModel
+from dayline.ui.viewmodels.settings_vm import SettingsViewModel
 
 TODAY = date.today()
 
@@ -67,3 +68,46 @@ def test_last_page_restored_on_start(tmp_path: Path) -> None:
     anyv: Any = vm
     anyv.start()
     assert anyv.page == "settings"
+
+
+# ---- Mica backdrop ---------------------------------------------------------
+def test_mica_defaults_on() -> None:
+    assert Settings().mica is True
+
+
+def test_mica_active_requires_support_and_pref(tmp_path: Path) -> None:
+    vm = AppViewModel(
+        Settings(vault_path=str(_vault(tmp_path))),
+        theme_probe=lambda: "light",
+        mica_probe=lambda: True,
+    )
+    anyv: Any = vm
+    assert anyv.micaActive is True
+    assert anyv.micaSupported is True
+    vm.settings.mica = False
+    assert anyv.micaActive is False
+
+
+def test_mica_inactive_when_unsupported(tmp_path: Path) -> None:
+    vm = AppViewModel(
+        Settings(vault_path=str(_vault(tmp_path)), mica=True),
+        theme_probe=lambda: "light",
+        mica_probe=lambda: False,
+    )
+    anyv: Any = vm
+    assert anyv.micaSupported is False
+    assert anyv.micaActive is False
+
+
+def test_mica_toggle_persists(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.json"
+    vm = SettingsViewModel(Settings(), config_path=cfg)
+    anyvm: Any = vm
+    assert anyvm.mica is True
+    groups: list[str] = []
+    anyvm.applied.connect(lambda g: groups.append(g))
+    anyvm.setMica(False)
+    assert anyvm.mica is False
+    assert groups == ["appearance"]
+    reloaded, _issues = load(cfg)
+    assert reloaded.mica is False
