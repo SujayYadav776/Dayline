@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any, cast
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
@@ -88,7 +87,12 @@ def main(argv: list[str] | None = None) -> int:
     from dayline.ui import crash
 
     crash.install(logs_dir())
-    app = cast("QGuiApplication", QGuiApplication.instance() or QGuiApplication(sys.argv))
+    # QApplication (not QGuiApplication) is required because the system tray +
+    # its context menu are QtWidgets (QSystemTrayIcon/QMenu); showing a widget
+    # under a bare QGuiApplication makes Qt abort() on a real desktop.
+    from PySide6.QtWidgets import QApplication
+
+    app = cast("QApplication", QApplication.instance() or QApplication(sys.argv))
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import shutil
 from datetime import date, timedelta
 from pathlib import Path
@@ -11,6 +12,16 @@ import pytest
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "vaults"
 TODAY = date.today()
+
+
+def test_app_boots_with_qapplication_not_qguiapplication() -> None:
+    """The tray (QSystemTrayIcon) + QMenu are QtWidgets; booting as a bare
+    QGuiApplication makes Qt abort() on a real desktop (the frozen v1.1.0 crash)."""
+    from dayline import app as dayline_app
+
+    src = inspect.getsource(dayline_app.main)
+    assert "QApplication(" in src, "main() must construct a QApplication"
+    assert "QGuiApplication(" not in src, "main() must not use QGuiApplication"
 
 
 @pytest.mark.usefixtures("qapp_instance")
