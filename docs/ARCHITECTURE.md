@@ -77,4 +77,9 @@ src/dayline/
 | FR-P9 live theme | `system_theme.py`, `Main` Binding | screenshot QA | ✅ |
 | FR-O6 open in Obsidian | `app_vm.openInObsidian` | unit (uri) | ✅ |
 
-Remaining: hardening (M6); release packaging + About (M7).
+| §6.5 crash hook + dialog | `ui/crash.py` | test_hardening | ✅ |
+| §4.4 log privacy (no task text) | logging config | test_hardening | ✅ |
+| §1.6 perf (week ≤200ms, 500 tasks) | stats cache, store | test_hardening | ✅ |
+| §4.7 accessibility | Accessible.* across QML | test_hardening | ✅ |
+
+Remaining: release packaging + About + v1.0.0 (M7).

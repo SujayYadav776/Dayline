@@ -84,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     configure_logging()
+    from dayline.platform.paths import logs_dir
+    from dayline.ui import crash
+
+    crash.install(logs_dir())
     app = cast("QGuiApplication", QGuiApplication.instance() or QGuiApplication(sys.argv))
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_NAME)
