@@ -203,6 +203,18 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
     controller.schedule_notifications()
     controller.sync_autostart()
     controller._settings_handler = _on_settings  # keep closure alive
+
+    # Updates: tray toast, silent installer launch, quit — wired to the VM.
+    from PySide6.QtCore import QTimer
+
+    from dayline.platform.installer import launch_setup_exe
+
+    def _update_notify(title: str, msg: str) -> None:
+        if controller._tray is not None:
+            controller._tray.notify(title, msg)
+
+    vm.set_update_hooks(notify=_update_notify, launcher=launch_setup_exe, quit_app=app.quit)
+    QTimer.singleShot(4000, vm.startup_update_check)  # after first paint; opt-in guarded
     return controller
 
 

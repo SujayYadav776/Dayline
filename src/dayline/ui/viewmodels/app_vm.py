@@ -25,12 +25,15 @@ from dayline.core.obsidian import (
 from dayline.core.rollover import rollover
 from dayline.core.settings import Settings, save
 from dayline.core.store import Store
+from dayline.core.updater import UpdateInfo, should_check
 from dayline.core.watcher import ChangeDetector
 from dayline.platform.dwm import supports_system_backdrop
 from dayline.platform.motion import make_motion_source
-from dayline.platform.paths import obsidian_json
+from dayline.platform.paths import local_appdata_dir, obsidian_json
 from dayline.platform.system_theme import make_theme_source
+from dayline.platform.update_net import download, github_latest_url, http_get
 from dayline.ui.sync import FileSync
+from dayline.ui.update_service import UpdateService
 from dayline.ui.viewmodels.settings_vm import SettingsViewModel
 from dayline.ui.viewmodels.today_vm import TodayViewModel
 from dayline.ui.viewmodels.week_vm import WeekViewModel
@@ -39,6 +42,10 @@ log = logging.getLogger("dayline.ui.app_vm")
 
 PAGE_TODAY = "today"
 _PRIORITY_FROM_LABEL = {"high": Priority.HIGH, "medium": Priority.MEDIUM, "low": Priority.LOW}
+# Update discovery source. Public repo → GitHub's releases/latest API needs no
+# token; the request is opt-in (Settings toggle) and the https/host guard in
+# platform/update_net.py constrains where it can fetch a binary from.
+UPDATE_REPO = "SujayYadav776/Dayline"
 
 
 class AppViewModel(QObject):
@@ -55,6 +62,8 @@ class AppViewModel(QObject):
         theme_probe: Callable[[], str] | None = None,
         motion_probe: Callable[[], bool] | None = None,
         mica_probe: Callable[[], bool] | None = None,
+        update_fetcher: Callable[[str], bytes] | None = None,
+        update_downloader: Callable[[str, Path], Path] | None = None,
         parent: Any = None,
     ) -> None:
         super().__init__(parent)
@@ -82,6 +91,24 @@ class AppViewModel(QObject):
             settings, config_path, on_reload=self.start, parent=self
         )
         self._settings_vm.applied.connect(self._on_settings_applied)
+        # ---- updates (opt-in; default off) ----------------------------------
+        self._updater = UpdateService(
+            current_version=_version_str(),
+            url=github_latest_url(UPDATE_REPO),
+            fetcher=update_fetcher or http_get,
+            downloader=update_downloader or download,
+            parent=self,
+        )
+        self._updater.resultReady.connect(self._on_update_result)
+        self._updater.failed.connect(self._on_update_failed)
+        self._updater.downloadReady.connect(self._on_update_downloaded)
+        self._update_info: UpdateInfo | None = None
+        self._update_status = ""
+        self._update_user_initiated = False
+        # Injected by app.py: tray.notify, installer launch, quit (None = no-op).
+        self._update_notify: Callable[[str, str], None] | None = None
+        self._installer_launcher: Callable[[str], None] | None = None
+        self._quit_app: Callable[[], None] | None = None
         self.editor: TaskEditor | None = None
         self._detector: ChangeDetector | None = None
         self._sync: FileSync | None = None
@@ -188,8 +215,114 @@ class AppViewModel(QObject):
                 except DaylineError as exc:
                     self._error = str(exc)
             self.changed.emit()
+        elif group == "updates":
+            # Turning the toggle on gives immediate feedback; turning it off
+            # clears any shown state.
+            if self.settings.update_check_enabled:
+                self.checkForUpdates()
+            else:
+                self._update_info = None
+                self._update_status = ""
+                self.changed.emit()
         else:
             self.changed.emit()
+
+    # -- updates (opt-in) -----------------------------------------------------
+    currentVersion = Property(str, lambda self: _version_str(), notify=changed)
+    updateStatus = Property(str, lambda self: self._update_status, notify=changed)
+    updateChecking = Property(bool, lambda self: self._updater.busy, notify=changed)
+    updateAvailable = Property(bool, lambda self: self._update_info is not None, notify=changed)
+    updateLatest = Property(
+        str, lambda self: self._update_info.version if self._update_info else "", notify=changed
+    )
+    updatePageUrl = Property(
+        str, lambda self: self._update_info.page_url if self._update_info else "", notify=changed
+    )
+    updateDownloadUrl = Property(
+        str,
+        lambda self: self._update_info.download_url if self._update_info else "",
+        notify=changed,
+    )
+
+    def set_update_hooks(
+        self,
+        notify: Callable[[str, str], None] | None = None,
+        launcher: Callable[[str], None] | None = None,
+        quit_app: Callable[[], None] | None = None,
+    ) -> None:
+        """Inject tray-notify / installer-launch / quit from the platform layer."""
+        self._update_notify = notify or self._update_notify
+        self._installer_launcher = launcher or self._installer_launcher
+        self._quit_app = quit_app or self._quit_app
+
+    @Slot()
+    def checkForUpdates(self) -> None:
+        self._update_user_initiated = True
+        self._update_status = "Checking for updates…"
+        self.changed.emit()
+        self._updater.check()
+
+    def startup_update_check(self, now: datetime | None = None) -> None:
+        """Automatic once-a-day check when the user opted in (silent unless found)."""
+        s = self.settings
+        if not s.update_check_enabled:
+            return
+        if not should_check(s.update_last_check, now or datetime.now()):
+            return
+        s.update_last_check = (now or datetime.now()).isoformat(timespec="seconds")
+        self._persist_settings()
+        self._update_user_initiated = False
+        self._updater.check()
+
+    @Slot()
+    def installUpdate(self) -> None:
+        info = self._update_info
+        if not info or not info.download_url:
+            return
+        dest = local_appdata_dir() / "Dayline" / "update" / f"Dayline-Setup-{info.version}.exe"
+        self._update_status = "Downloading update…"
+        self.changed.emit()
+        self._updater.download(info.download_url, str(dest))
+
+    def _on_update_result(self, info: UpdateInfo | None) -> None:
+        self._update_info = info
+        if info is not None:
+            self._update_status = f"Dayline {info.version} is available"
+            if self._update_notify:
+                self._update_notify("Dayline", f"Update {info.version} is available.")
+        elif self._update_user_initiated:
+            self._update_status = f"You're up to date (v{_version_str()})"
+        else:
+            self._update_status = ""
+        self._update_user_initiated = False
+        self.changed.emit()
+
+    def _on_update_failed(self, error: str) -> None:
+        if self._update_user_initiated:
+            self._update_status = f"Couldn't check for updates ({error[:60]})"
+        else:
+            self._update_status = ""
+        self._update_user_initiated = False
+        log.info("update check failed: %s", error)
+        self.changed.emit()
+
+    def _on_update_downloaded(self, path: str) -> None:
+        self._update_status = "Installing update…"
+        self.changed.emit()
+        if self._update_notify:
+            self._update_notify("Dayline", "Installing update…")
+        if self._installer_launcher:
+            self._installer_launcher(path)
+        if self._quit_app:
+            self._quit_app()
+
+    def _persist_settings(self) -> None:
+        if self._config_path is None:
+            return
+        try:
+            save(self._config_path, self.settings)
+        except OSError:
+            log.warning("could not persist update settings", exc_info=True)
 
     @Property(list, notify=changed)
     def detectedVaults(self) -> list[dict[str, Any]]:
@@ -464,3 +597,9 @@ def _safe_day_start(text: str) -> int:
         return min(parse_day_start_minutes(text), 6 * 60)
     except ValueError:
         return 0
+
+
+def _version_str() -> str:
+    from dayline import __version__
+
+    return __version__

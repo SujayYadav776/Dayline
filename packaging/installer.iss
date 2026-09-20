@@ -20,6 +20,9 @@ DefaultDirName={localappdata}\Programs\Dayline
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+; A silent one-click update must close the running app before replacing files.
+CloseApplications=force
+CloseApplicationsFilter=*.exe,*.dll
 OutputDir=..\dist\installer
 OutputBaseFilename=Dayline-Setup-{#AppVersion}
 SetupIconFile=..\src\dayline\ui\assets\app.ico

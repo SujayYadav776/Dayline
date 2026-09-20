@@ -30,6 +30,9 @@ class Settings:
     close_to_tray: bool = True
     hotkey: str = "ctrl+alt+n"
     quick_add_enabled: bool = True
+    # Updates (opt-in; a deliberate exception to the no-telemetry default)
+    update_check_enabled: bool = False  # auto-check at most once a day, at startup
+    update_last_check: str = ""  # ISO timestamp of the last automatic check
     # Obsidian
     vault_path: str = ""
     folder: str = DEFAULT_FOLDER

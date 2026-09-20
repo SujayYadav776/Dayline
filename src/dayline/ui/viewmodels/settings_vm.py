@@ -67,6 +67,7 @@ class SettingsViewModel(QObject):
     autostart = Property(bool, lambda self: self._s.autostart, notify=changed)
     hotkey = Property(str, lambda self: self._s.hotkey, notify=changed)
     quickAddEnabled = Property(bool, lambda self: self._s.quick_add_enabled, notify=changed)
+    updateCheckEnabled = Property(bool, lambda self: self._s.update_check_enabled, notify=changed)
     notificationsEnabled = Property(
         bool, lambda self: self._s.notifications_enabled, notify=changed
     )
@@ -140,6 +141,10 @@ class SettingsViewModel(QObject):
     @Slot(bool)
     def setQuickAddEnabled(self, value: bool) -> None:
         self._set("quick_add_enabled", value, "general")
+
+    @Slot(bool)
+    def setUpdateCheckEnabled(self, value: bool) -> None:
+        self._set("update_check_enabled", value, "updates")
 
     @Slot(bool)
     def setNotificationsEnabled(self, value: bool) -> None:

@@ -158,6 +158,57 @@ Item {
                 Labeled { label: "Global quick-add"; value: page.vm.hotkey }
             }
 
+            // ---- Updates ---------------------------------------------------
+            Card {
+                title: "Updates"
+                Row {
+                    width: parent.width
+                    SettingRow { label: "Auto-check (daily)"; width: parent.width - uc.width }
+                    Switch {
+                        id: uc
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.updateCheckEnabled
+                        onToggled: page.vm.setUpdateCheckEnabled(checked)
+                    }
+                }
+                Text {
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: "Dayline v" + (page.app ? page.app.currentVersion : "")
+                          + "  ·  updates are checked only when you opt in"
+                    color: Theme.textSecondary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.captionPx
+                }
+                ActionButton {
+                    text: page.app && page.app.updateChecking ? "Checking…" : "Check now"
+                    enabled: !(page.app && page.app.updateChecking)
+                    onClicked: if (page.app) page.app.checkForUpdates()
+                }
+                Text {
+                    visible: page.app && page.app.updateStatus !== ""
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    text: page.app ? page.app.updateStatus : ""
+                    color: page.app && page.app.updateAvailable ? Theme.success : Theme.textSecondary
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.captionPx
+                }
+                Row {
+                    visible: page.app && page.app.updateAvailable
+                    spacing: Theme.s8
+                    ActionButton {
+                        text: "Install update"
+                        onClicked: if (page.app) page.app.installUpdate()
+                    }
+                    ActionButton {
+                        text: "Release notes"
+                        onClicked: if (page.app && page.app.updatePageUrl)
+                                       Qt.openUrlExternally(page.app.updatePageUrl)
+                    }
+                }
+            }
+
             // ---- About -----------------------------------------------------
             Card {
                 title: "About"
