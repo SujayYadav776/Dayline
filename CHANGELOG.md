@@ -2,6 +2,16 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] — 2026-09-20
+
+### Fixed
+- **Frozen app crashed on launch** (`Dayline.exe` exit `0xC0000409` in
+  `Qt6Core.dll`) on Windows 11 desktops. The system tray (`QSystemTrayIcon`) and
+  its context menu (`QMenu`) are **QtWidgets**, but the app was bootstrapping a
+  bare `QGuiApplication`; showing a widget under it makes Qt `abort()` — but only
+  in a real interactive session, so the offscreen selftest/tests never caught it.
+  The bootstrap now creates a **`QApplication`**. Added a regression guard test.
+
 ## [1.1.0] — 2026-09-20
 
 ### UI

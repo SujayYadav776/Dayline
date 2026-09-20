@@ -1,6 +1,6 @@
 [project]
 name = "dayline"
-version = "1.1.0"
+version = "1.1.1"
 description = "Dayline — a Windows to-do app that uses an Obsidian vault as its database."
 requires-python = "==3.12.*"
 authors = [{ name = "Sujay Yadav" }]

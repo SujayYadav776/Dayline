@@ -2,6 +2,13 @@
 
 Perform on the installed build (not dev tree) unless noted. Tick with date + build version.
 
+> **Always do the "launch the installed Dayline.exe on a real desktop" smoke.** An
+> offscreen/headless green build does NOT prove the tray/hotkey/DWM paths work:
+> booting as `QGuiApplication` made `tray.show()` `abort()` (0xC0000409) only in a
+> real interactive session — this shipped once and is now prevented by using
+> `QApplication` + a regression test (see DECISIONS D-018).
+
+- [ ] Double-click the installed `Dayline.exe` → the window opens and STAYS open (no crash), tray icon appears
 - [ ] Sleep the machine across midnight → rollover runs on wake; correct logical day
 - [ ] DST change (simulated by moving system clock) → no missed/double rollover
 - [ ] Vault inside a OneDrive/Dropbox folder → edits sync both ways; no corruption
