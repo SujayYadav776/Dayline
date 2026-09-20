@@ -66,4 +66,15 @@ src/dayline/
 | §3.8 Onboarding wizard | `Onboarding.qml`, `app_vm.firstRun` | screenshot QA | ✅ |
 | FR-O9 legacy import | `settings_vm.importLegacy` | test_week_settings_vm | ✅ |
 
-Remaining: Windows integration (M5); hardening (M6); "Open in Obsidian" button + release (M7).
+| FR-P1 tray icon + menu | `platform/tray.py`, `app_controller` | smoke (headless) | ✅ (real tray: human) |
+| FR-P2 close-to-tray | `app_controller.suppressClose`, `Main.onClosing` | unit | ✅ |
+| FR-P3 single instance | `platform/single_instance.py` | smoke (acquire True) | ✅ |
+| FR-P4 autostart HKCU Run | `platform/autostart.py` | test_adapters (FakeReg) | ✅ (reboot: human) |
+| FR-P5 global hotkey | `platform/hotkey.py` (RegisterHotKey+filter) | test_adapters (parse/bind) | ✅ (real keypress: human) |
+| FR-P6 quick-add popup | `Main.qml` quickAdd Window | screenshot | ✅ |
+| FR-P7 notifications | `app_controller.schedule_notifications` | unit | ✅ |
+| FR-P8 dark title bar | `platform/dwm.py` | smoke (no crash) | ✅ (visual: human) |
+| FR-P9 live theme | `system_theme.py`, `Main` Binding | screenshot QA | ✅ |
+| FR-O6 open in Obsidian | `app_vm.openInObsidian` | unit (uri) | ✅ |
+
+Remaining: hardening (M6); release packaging + About (M7).

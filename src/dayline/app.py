@@ -6,7 +6,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
@@ -90,20 +90,98 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationDisplayName(APP_NAME)
     app.setApplicationVersion(_version())
 
+    # single instance: a second launch asks the running one to show, then exits
+    from dayline.platform.single_instance import SingleInstance
+
+    pending_show = {"v": False}
+
+    def _second_launch() -> None:
+        pending_show["v"] = True
+
+    si = SingleInstance(_second_launch)
+    if not args.selftest and not si.acquire():
+        _report("another Dayline instance is already running; signaled it to show")
+        return 0
+
     engine, vm = create_engine()
     roots = engine.rootObjects()
     if not roots:
         _report("FATAL: failed to load QML UI")
         return 1
     vm.start()
+    window: Any = roots[0]
 
     if args.selftest:
-        window = roots[0]
         ok = window.objectName() == "rootWindow" and bool(window.property("qmlReady"))
         _report(f"selftest: qml_loaded={'ok' if ok else 'failed'}")
         return 0 if ok else 1
 
-    return app.exec()
+    controller = _integrate_windows(app, engine, vm, window)
+    if args.minimized:
+        window.hide()
+    elif pending_show["v"]:
+        controller.toggle_window()
+
+    rc = app.exec()
+    si.shutdown()
+    return rc
+
+
+def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
+    """Construct and wire the Windows integrations. Returns the controller."""
+    from PySide6.QtGui import QIcon
+
+    from dayline.platform.autostart import Autostart
+    from dayline.platform.hotkey import GlobalHotkey, HotkeyFilter
+    from dayline.platform.tray import Tray
+    from dayline.ui.app_controller import AppController
+
+    icon = QIcon(str(qml_dir().parent / "assets" / "app.png"))
+
+    def open_obsidian() -> None:
+        vm.openInObsidian()
+
+    tray = Tray(
+        icon,
+        on_activate=lambda: controller.toggle_window(),
+        on_quick_add=lambda: _trigger_quick_add(vm),
+        on_open_obsidian=open_obsidian,
+        on_quit=lambda: controller.quit(),
+    )
+    hotkey = GlobalHotkey()
+    autostart = Autostart()
+    controller = AppController(
+        window=window,
+        vm=vm,
+        tray=tray,
+        hotkey=hotkey,
+        autostart=autostart,
+        quick_add=lambda: _trigger_quick_add(vm),
+        open_obsidian=open_obsidian,
+        quit_app=app.quit,
+    )
+    engine.rootContext().setContextProperty("Controller", controller)
+
+    if tray.available():
+        tray.show()
+    else:
+        controller._tray = None  # no tray → notify() no-ops, menu unavailable
+    # global hotkey via native event filter (Windows only; needs a message loop)
+    if sys.platform == "win32":
+        qf = HotkeyFilter(lambda: _trigger_quick_add(vm))
+        app.installNativeEventFilter(qf)
+        controller.bind_hotkey()
+        controller._native_filter = qf  # keep alive
+    controller.apply_titlebar_theme()
+    vm.changed.connect(controller.apply_titlebar_theme)
+    vm.changed.connect(controller.schedule_notifications)
+    controller.schedule_notifications()
+    controller.sync_autostart()
+    return controller
+
+
+def _trigger_quick_add(vm: Any) -> None:
+    vm.showQuickAdd()
 
 
 def _version() -> str:

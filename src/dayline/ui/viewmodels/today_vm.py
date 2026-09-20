@@ -108,6 +108,9 @@ class TodayViewModel(QObject):
     def current_date(self) -> date:
         return self._day
 
+    def open_count(self) -> int:
+        return self._stats.open_count
+
     @property
     def is_today(self) -> bool:
         return self._today_flag

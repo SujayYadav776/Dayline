@@ -82,3 +82,10 @@ PRD and every resolved ambiguity lands here.
 - **Context:** FR-T6 wants session undo/redo of add/edit/complete/delete/reorder/priority. Surgical edits make per-field inverses fiddly, and blind byte-restore could clobber a concurrent Obsidian edit.
 - **Decision:** each action records (path, existed_before, before_bytes, after_bytes). Undo/redo restores bytes only when the file currently equals the expected side; a mismatch (external edit since) makes the step a no-op rather than a clobber. Undoing a note the app *created* restores an empty managed section (never deletes a file).
 - **Consequence:** correct, safe, ≤100-step history; verified by test_editor (undo/redo, created-note, stale-skip) and test_actions (no self-reload loop).
+
+
+## D-016 · Windows integrations degrade gracefully off a real desktop (M5)
+- **Context:** the frozen `--selftest` and CI run headless (offscreen). Calling `QSystemTrayIcon.show()` or DWM there segfaulted.
+- **Decision:** guard `tray.show()` behind `QSystemTrayIcon.isSystemTrayAvailable()`; only install the native hotkey filter on `win32`; `set_dark_titlebar` already returns False off-Windows. The selftest path skips `_integrate_windows` entirely.
+- **Consequence:** headless/CI boots clean; tray/hotkey/DWM/autostart are exercised by unit tests with fakes and a headless Windows smoke (single-instance acquire + real RegisterHotKey confirmed). Final tray icon, hotkey popup, autostart-after-reboot, and dark title bar need an interactive Windows session — documented in QA.md as human steps.
+- **Also:** `ctypes.wintypes` must be imported explicitly (`import ctypes.wintypes`); `ctypes.windll` alone doesn't pull it in, which crashed the native event filter on every message.

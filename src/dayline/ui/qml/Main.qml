@@ -24,6 +24,12 @@ ApplicationWindow {
         restoreMode: Binding.RestoreNone
     }
 
+    // Close-to-tray (FR-P2): hide instead of quit when the setting is on.
+    onClosing: (mouse) => {
+        if (typeof Controller !== "undefined" && Controller && Controller.suppressClose())
+            mouse.accepted = false
+    }
+
     Component.onCompleted: win.qmlReady = true
 
     // ---- routing -----------------------------------------------------------
@@ -117,6 +123,76 @@ ApplicationWindow {
     Component {
         id: settingsComp
         SettingsPage { vm: App.settingsVM; app: App }
+    }
+
+    // ---- quick-add popup (FR-P6) --------------------------------------------
+    Window {
+        id: quickAdd
+        width: 480
+        height: 76
+        visible: App.quickAddVisible
+        flags: Qt.Dialog | Qt.FramelessWindowHint
+        color: Theme.surface
+        title: "Quick add"
+        x: win.x + (win.width - width) / 2
+        y: win.y + win.height / 3
+
+        onVisibleChanged: if (visible) qaField.forceActiveFocus()
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.radiusCard
+            color: Theme.surface
+            border.color: Theme.accent
+            border.width: 1
+        }
+
+        function parsedPriority() {
+            var m = /(!{1,3})$/.exec(qaField.text.trim())
+            if (!m) return ""
+            return { 1: "low", 2: "medium", 3: "high" }[m[1].length] || ""
+        }
+
+        Row {
+            anchors.fill: parent
+            anchors.margins: Theme.s16
+            spacing: Theme.s8
+            Rectangle {
+                width: 10; height: 10; radius: 5
+                anchors.verticalCenter: parent.verticalCenter
+                visible: quickAdd.parsedPriority() !== ""
+                color: Theme.prioColor(quickAdd.parsedPriority())
+            }
+            TextInput {
+                id: qaField
+                width: parent.width - 10 - parent.spacing - 60
+                anchors.verticalCenter: parent.verticalCenter
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.bodyPx
+                color: Theme.text
+                selectionColor: Theme.accent
+                cursorVisible: true
+                clip: true
+                text: ""
+                function submit() {
+                    var t = text.trim()
+                    if (t.length > 0) App.addTask(t)
+                    text = ""
+                    App.hideQuickAdd()
+                }
+                Keys.onReturnPressed: submit()
+                Keys.onEnterPressed: submit()
+                Keys.onEscapePressed: App.hideQuickAdd()
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Enter ↵"
+                color: Theme.textSecondary
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.captionPx
+            }
+        }
     }
 
     // ---- keyboard (§4.6) ----------------------------------------------------

@@ -61,6 +61,7 @@ class AppViewModel(QObject):
         self._page = PAGE_TODAY
         self._error = ""
         self._force_setup = False
+        self._quick_add = False
         self._day_start_min = _safe_day_start(settings.day_start)
         self._last_wall: float | None = None
         self._last_mono: float | None = None
@@ -381,6 +382,45 @@ class AppViewModel(QObject):
             self.editor.redo()
             self._reload()
             self.changed.emit()
+
+    # -- quick-add popup (FR-P6) ------------------------------------------------
+    quickAddVisible = Property(bool, lambda self: self._quick_add, notify=changed)
+
+    @Slot()
+    def showQuickAdd(self) -> None:
+        self._quick_add = True
+        self.changed.emit()
+
+    @Slot()
+    def hideQuickAdd(self) -> None:
+        self._quick_add = False
+        self.changed.emit()
+
+    def obsidian_uri(self) -> str:
+        """obsidian://open URI for the logical-today note (FR-O6)."""
+        from dayline.core.obsidian import note_rel_no_ext, open_uri
+
+        dn = DailyNotesSettings(self.settings.folder, self.settings.date_format)
+        if dn.unsupported or not self.settings.vault_path:
+            return ""
+        rel = note_rel_no_ext(dn, self._logical_today())
+        return open_uri(Path(self.settings.vault_path).name, rel)
+
+    @Slot()
+    def openInObsidian(self) -> None:
+        uri = self.obsidian_uri()
+        if not uri:
+            return
+        import sys
+
+        if sys.platform == "win32":
+            import os
+
+            os.startfile(uri)
+        else:  # pragma: no cover
+            import subprocess
+
+            subprocess.run(["xdg-open", uri], check=False)
 
     def _reload(self) -> None:
         self._load_day(self.today.current_date)
