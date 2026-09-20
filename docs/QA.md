@@ -17,3 +17,12 @@ Perform on the installed build (not dev tree) unless noted. Tick with date + bui
 - [ ] Very long task text (≥ 500 chars) → wraps, no layout break
 - [ ] 500 tasks in one day → add/scroll stays responsive
 - [ ] Emoji-heavy tasks (📌🧪 flags, ZWJ sequences) → round-trip byte-exact, display correct
+
+## M5/M6 items requiring an interactive Windows session (fake/unit-tested, not headless-verifiable)
+- [ ] Tray icon appears; left-click toggles window; menu items work (Quick add · Open today in Obsidian · Show · Quit)
+- [ ] Global hotkey Ctrl+Alt+N opens the quick-add popup from another app; Enter adds to today; conflict shows a friendly error
+- [ ] Close-to-tray: clicking X hides to tray (when on); Quit via tray/Ctrl+Q exits (when off)
+- [ ] Autostart toggle writes/clears HKCU Run; after reboot Dayline starts minimized to tray
+- [ ] Dark title bar follows the theme live (DWM) on Win10 20H1+ and Win11
+- [ ] Crash dialog: force an error → dialog appears with "Open logs folder"; logs contain no task text
+- [ ] 125/150/200% display scaling; light/dark switch while running
