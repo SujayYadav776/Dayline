@@ -2,7 +2,7 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.1] — 2026-09-25
 
 ### Added
 - **Universal summon key (Ctrl+Shift+D).** While Dayline runs (tray or
