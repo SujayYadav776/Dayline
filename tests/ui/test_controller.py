@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from PySide6.QtGui import QIcon
+
+from dayline.platform.tray import Tray
 from dayline.ui.app_controller import AppController
 
 
@@ -151,8 +154,18 @@ class _ToastVM:
         return self._counts
 
 
-class _ToastTray:
+class _ToastTray(Tray):
+    """Real Tray subclass so the controller's `Tray | None` annotation checks;
+    only notify() is exercised and Tray.__init__ never touches the platform."""
+
     def __init__(self) -> None:
+        super().__init__(
+            QIcon(),
+            on_activate=lambda: None,
+            on_quick_add=lambda: None,
+            on_open_obsidian=lambda: None,
+            on_quit=lambda: None,
+        )
         self.msgs: list[tuple[str, str]] = []
 
     def notify(self, title: str, msg: str, ms: int = 6000) -> None:
