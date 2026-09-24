@@ -2,7 +2,7 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
-## [1.3.0] — unreleased (local design pass, not published)
+## [1.3.0] — 2026-09-24
 
 ### Added
 - **Natural-language quick add.** Typing "pay rent tomorrow", "gym friday",
