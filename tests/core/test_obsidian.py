@@ -8,12 +8,15 @@ from pathlib import Path
 
 from dayline.core.obsidian import (
     DailyNotesSettings,
+    block_ref_of,
     find_vaults,
     is_conflict_copy,
+    jump_uri,
     note_path,
     note_rel_no_ext,
     open_uri,
     read_daily_notes,
+    search_uri,
 )
 
 D = date(2026, 9, 19)
@@ -94,3 +97,57 @@ def test_conflict_copy_detection() -> None:
     assert is_conflict_copy("2026-09-19 (conflicted copy ADMIN 2026-09-19).md")
     assert is_conflict_copy("2026-09-19's conflicted copy.md")
     assert not is_conflict_copy("2026-09-19.md")
+
+
+# ---- click-a-task → jump to its exact line ----------------------------------
+def test_block_ref_of_detects_anchor() -> None:
+    assert block_ref_of("- [ ] ship it ^tk42") == "tk42"
+    assert block_ref_of("- [ ] ship it ^tk-42  ") == "tk-42"
+    assert block_ref_of("- [ ] ship it") is None
+    assert block_ref_of("- [ ] caret ^ inside, not trailing") is None
+    assert block_ref_of("- [ ] bad ^not-an-id!") is None
+
+
+def test_open_uri_with_block_anchor() -> None:
+    uri = open_uri("vault", "Daily/2026-09-19", block="tk42")
+    assert uri == "obsidian://open?vault=vault&file=Daily%2F2026-09-19%23%5Etk42"
+
+
+def test_jump_uri_prefers_block_anchor() -> None:
+    uri = jump_uri("vault", "Daily/2026-09-19", "- [ ] buy milk ^tk42", "buy milk")
+    assert uri.startswith("obsidian://open?") and "%23%5Etk42" in uri
+
+
+def test_jump_uri_falls_back_to_in_note_search() -> None:
+    from urllib.parse import unquote, urlparse
+
+    uri = jump_uri("vault", "Daily/2026-09-19", "- [ ] Buy oat milk", "Buy oat milk")
+    assert uri.startswith("obsidian://search?vault=vault&query=")
+    q = unquote(urlparse(uri).query.split("query=", 1)[1])
+    assert q == 'file:"2026-09-19" "Buy oat milk"'
+
+
+def test_jump_uri_cleans_and_caps_phrase() -> None:
+    from urllib.parse import unquote
+
+    uri = jump_uri("v", "Daily/x", "- [ ] a", '  he said "hi"   there  ' + "z" * 200)
+    q = unquote(uri.split("query=", 1)[1])
+    assert q.startswith('file:"x" "he said hi there z')
+    # quoted phrase is capped at 80 chars: fixed prefix + 80 + closing quote
+    inner = q[len('file:"x" "') : -1]
+    assert len(inner) == 80
+    assert "  " not in inner and chr(34) not in inner
+
+
+def test_jump_uri_empty_description_opens_note() -> None:
+    uri = jump_uri("vault", "Daily/2026-09-19", "- [ ]   ", "   ")
+    assert uri == "obsidian://open?vault=vault&file=Daily%2F2026-09-19"
+
+
+def test_search_uri_encodes_query() -> None:
+    from urllib.parse import quote
+
+    uri = search_uri("My Vault", 'file:"a b" "c &d"')
+    assert uri == (
+        "obsidian://search?vault=My%20Vault&query=" + quote('file:"a b" "c &d"', safe="")
+    )

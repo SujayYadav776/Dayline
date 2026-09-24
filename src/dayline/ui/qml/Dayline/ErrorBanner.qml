@@ -10,8 +10,8 @@ Rectangle {
     width: parent ? parent.width : 0
     height: Math.max(inner.implicitHeight + 2 * Theme.s12, 44)
     radius: Theme.radiusControl
-    color: Theme.dark ? "#3A2324" : "#FDECEC"
-    border.color: Theme.danger
+    color: Qt.alpha(Theme.danger, dark ? 0.16 : 0.08)
+    border.color: Qt.alpha(Theme.danger, 0.4)
     border.width: 1
 
     Row {

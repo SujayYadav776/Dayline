@@ -25,7 +25,8 @@ Rectangle {
             color: Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sectionPx
-            font.weight: Font.DemiBold
+            font.weight: Theme.weightHeading
+            font.letterSpacing: Theme.headingTracking
         }
     }
 }

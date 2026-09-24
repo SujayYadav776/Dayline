@@ -77,6 +77,9 @@ src/dayline/
 | FR-P9 live theme | `system_theme.py`, `Main` Binding | screenshot QA | ✅ |
 | polish · Mica backdrop | `platform/dwm.py`, `app_vm.micaActive`, `Main` color | unit (build gate + probe) | ✅ (see-through: human, Win11) |
 | polish · update check (opt-in) | `core/updater`, `platform/update_net`+`installer`, `ui/update_service` | unit (parse/compare/guard/VM-thread) | ✅ (live fetch + silent upgrade: human, Win) |
+| polish · paper design system | `Theme.qml`, `assets/` (fonts/paper/glyphs), `app.load_bundled_fonts` | screenshot QA (both themes) | ✅ |
+| polish · week-strip nav + Progress panel | `WeekStrip.qml`, `ProgressPanel.qml`, `week_vm.strip/streak/activity` | test_paper_vm | ✅ |
+| polish · inline completed tasks | `today_vm.tasksList`, `TodayPage`, `TaskRow` | test_paper_vm | ✅ |
 | FR-O6 open in Obsidian | `app_vm.openInObsidian` | unit (uri) | ✅ |
 
 | §6.5 crash hook + dialog | `ui/crash.py` | test_hardening | ✅ |

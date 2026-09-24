@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -12,14 +13,20 @@ from typing import Any
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 
+from dayline.core import quickadd, recur
 from dayline.core.clock import detect_wake, logical_date, parse_day_start_minutes
 from dayline.core.editor import StaleEditError, TaskEditor
 from dayline.core.errors import DaylineError, NoteDecodeError
-from dayline.core.model import Priority
+from dayline.core.model import Priority, StatusKind
 from dayline.core.obsidian import (
+    DEFAULT_FOLDER,
+    DEFAULT_FORMAT,
     DailyNotesSettings,
     find_vaults,
+    jump_uri,
     note_path,
+    note_rel_no_ext,
+    open_uri,
     read_daily_notes,
 )
 from dayline.core.rollover import rollover
@@ -48,6 +55,31 @@ _PRIORITY_FROM_LABEL = {"high": Priority.HIGH, "medium": Priority.MEDIUM, "low":
 UPDATE_REPO = "SujayYadav776/Dayline"
 
 
+def _default_uri_open(uri: str) -> None:
+    """Hand an obsidian:// URI to the OS (tests inject uri_open instead)."""
+    import os
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        os.startfile(uri)
+    else:  # pragma: no cover
+        subprocess.run(["xdg-open", uri], check=False)
+
+
+def _default_file_open(path: str) -> None:
+    """Open a local file with the OS default handler (folder mode replaces the
+    Obsidian jump with this; tests inject file_open instead)."""
+    import os
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        os.startfile(path)
+    else:  # pragma: no cover
+        subprocess.run(["xdg-open", path], check=False)
+
+
 class AppViewModel(QObject):
     """Owns settings + store + navigation; exposes only display data to QML."""
 
@@ -64,12 +96,18 @@ class AppViewModel(QObject):
         mica_probe: Callable[[], bool] | None = None,
         update_fetcher: Callable[[str], bytes] | None = None,
         update_downloader: Callable[[str, Path], Path] | None = None,
+        sound_play: Callable[[], None] | None = None,
+        uri_open: Callable[[str], None] | None = None,
+        file_open: Callable[[str], None] | None = None,
         parent: Any = None,
     ) -> None:
         super().__init__(parent)
         self.settings = settings
         self.store: Store | None = None
         self._config_path = config_path
+        self._sound_play = sound_play or (lambda: None)
+        self._uri_open = uri_open or _default_uri_open
+        self._file_open = file_open or _default_file_open
         self._theme_source = make_theme_source(settings.theme, theme_probe)
         self._motion_source = make_motion_source(motion_probe)
         self._mica_source: Callable[[], bool] = mica_probe or supports_system_backdrop
@@ -129,6 +167,12 @@ class AppViewModel(QObject):
     )
     # Pure OS capability (drives whether the Settings toggle is shown).
     micaSupported = Property(bool, lambda self: bool(self._mica_source()), notify=changed)
+    # Thin paper: Main.qml drops the opaque window colour and paints the paper
+    # at 92% so the Mica blur peeks through — only meaningful while Mica is live.
+    thinPaper = Property(bool, lambda self: bool(self.settings.thin_paper), notify=changed)
+    # "folder" mode: any plain folder stores the daily notes; Obsidian-specific
+    # affordances (deep-link jumps) swap to opening the file with the OS default.
+    folderMode = Property(bool, lambda self: self.settings.vault_mode == "folder", notify=changed)
     errorText = Property(str, lambda self: self._error, notify=changed)
     vaultReady = Property(
         bool, lambda self: self.store is not None and not self._force_setup, notify=changed
@@ -423,10 +467,28 @@ class AppViewModel(QObject):
             self._error = f"Folder not found: {path}"
             self.changed.emit()
             return
+        self.settings.vault_mode = "obsidian"
         self.settings.vault_path = str(p)
         dn = read_daily_notes(p)
         self.settings.folder = dn.folder
         self.settings.date_format = dn.date_format if not dn.unsupported else "YYYY-MM-DD"
+        if self._config_path is not None:
+            save(self._config_path, self.settings)
+        self.start()
+
+    @Slot(str)
+    def selectFolder(self, path: str) -> None:
+        """Skip Obsidian entirely: store the daily notes in any plain folder
+        with Dayline's own defaults (Daily/YYYY-MM-DD.md)."""
+        p = Path(path)
+        if not p.is_dir():
+            self._error = f"Folder not found: {path}"
+            self.changed.emit()
+            return
+        self.settings.vault_mode = "folder"
+        self.settings.vault_path = str(p)
+        self.settings.folder = DEFAULT_FOLDER
+        self.settings.date_format = DEFAULT_FORMAT
         if self._config_path is not None:
             save(self._config_path, self.settings)
         self.start()
@@ -438,10 +500,21 @@ class AppViewModel(QObject):
     # -- loading with skeleton --------------------------------------------------
     def navigate(self, d: date) -> None:
         self.today.set_date(d)
+        self.week.set_anchor(d)
         if self.store is None:
             self.today.set_loading(False)
             return
         QTimer.singleShot(0, lambda: self._load_day(d))
+
+    @Slot(str)
+    def selectDay(self, date_str: str) -> None:
+        """Bottom calendar strip: open the tapped day (stays on Today)."""
+        try:
+            d = date.fromisoformat(date_str)
+        except ValueError:
+            return
+        self.navigate(d)
+        self._set_page(PAGE_TODAY)
 
     def _load_day(self, d: date) -> None:
         if self.store is None or d != self.today.current_date:
@@ -500,12 +573,36 @@ class AppViewModel(QObject):
     @Slot(str)
     def addTask(self, text: str) -> None:
         d = self.today.current_date
-        self._act("add", lambda: self.editor and self.editor.add(d, text))
+        body, rule = quickadd.extract_recurrence(text)
+        body, due = quickadd.parse(body, d)
+        if rule and due is None:
+            due = recur.next_occurrence(rule, d)  # first instance gets a real date
+        if due is not None and body:
+            body = _insert_due(body, due)
+        if rule and body:
+            body = _insert_recurrence(body, rule)
+        self._act("add", lambda: self.editor and self.editor.add(d, body))
 
     @Slot(int)
     def toggleTask(self, key: int) -> None:
         d = self.today.current_date
+        was_open = self.today.is_open(key)
         self._act("toggle", lambda: self.editor and self.editor.toggle(d, key))
+        if was_open and self.settings.completion_sound:
+            self._sound_play()
+
+    @Slot(int, str)
+    def rescheduleTask(self, key: int, date_str: str) -> None:
+        """Drag-to-reschedule: move a task to another day, then show that day."""
+        try:
+            target = date.fromisoformat(date_str)
+        except ValueError:
+            return
+        src = self.today.current_date
+        if src == target:
+            return
+        self._act("reschedule", lambda: self.editor and self.editor.move_to_day(src, key, target))
+        self.navigate(target)
 
     @Slot(int, str)
     def editTask(self, key: int, text: str) -> None:
@@ -546,6 +643,31 @@ class AppViewModel(QObject):
     # -- quick-add popup (FR-P6) ------------------------------------------------
     quickAddVisible = Property(bool, lambda self: self._quick_add, notify=changed)
 
+    # panel mode: Main.qml hides the window on focus loss when this is on
+    autoHide = Property(bool, lambda self: self.settings.auto_hide, notify=changed)
+
+    def due_summary(self) -> tuple[int, int]:
+        """(due today, overdue) counts of OPEN tasks in today's note — the
+        text source for the morning reminder toast. Tasks without a 📅 date
+        count as due today (they live in today's note)."""
+        if self.store is None:
+            return 0, 0
+        today = self._logical_today()
+        try:
+            doc = self.store.read_doc(today)
+        except (OSError, DaylineError):
+            return 0, 0
+        due = over = 0
+        for t in doc.tasks:
+            if t.kind is not StatusKind.OPEN:
+                continue
+            d = recur.due_of(t.body)
+            if d is None or d == today:
+                due += 1
+            elif d < today:
+                over += 1
+        return due, over
+
     @Slot()
     def showQuickAdd(self) -> None:
         self._quick_add = True
@@ -558,8 +680,6 @@ class AppViewModel(QObject):
 
     def obsidian_uri(self) -> str:
         """obsidian://open URI for the logical-today note (FR-O6)."""
-        from dayline.core.obsidian import note_rel_no_ext, open_uri
-
         dn = DailyNotesSettings(self.settings.folder, self.settings.date_format)
         if dn.unsupported or not self.settings.vault_path:
             return ""
@@ -568,19 +688,37 @@ class AppViewModel(QObject):
 
     @Slot()
     def openInObsidian(self) -> None:
-        uri = self.obsidian_uri()
-        if not uri:
+        if self.settings.vault_mode == "folder" and self.store is not None:
+            self._file_open(str(self.store.path_for(self.today.current_date)))
             return
-        import sys
+        uri = self.obsidian_uri()
+        if uri:
+            self._uri_open(uri)
 
-        if sys.platform == "win32":
-            import os
-
-            os.startfile(uri)
-        else:  # pragma: no cover
-            import subprocess
-
-            subprocess.run(["xdg-open", uri], check=False)
+    @Slot(int)
+    def openTaskInObsidian(self, key: int) -> None:
+        """Click-a-task → jump to its line in Obsidian: block anchor if the
+        line has a ^id, else a phrase search restricted to that day's note.
+        In folder mode there is no Obsidian, so the day's file opens with the
+        OS default handler instead."""
+        if self.settings.vault_mode == "folder" and self.store is not None:
+            self._file_open(str(self.store.path_for(self.today.current_date)))
+            return
+        dn = DailyNotesSettings(self.settings.folder, self.settings.date_format)
+        if dn.unsupported or not self.settings.vault_path or self.store is None:
+            return
+        d = self.today.current_date
+        try:
+            doc = self.store.read_doc(d)
+        except (OSError, DaylineError, NoteDecodeError):
+            return
+        rel = note_rel_no_ext(dn, d)
+        vault_name = Path(self.settings.vault_path).name
+        task = next((t for t in doc.tasks if t.line_no == key), None)
+        if task is None:
+            self._uri_open(open_uri(vault_name, rel))
+            return
+        self._uri_open(jump_uri(vault_name, rel, task.render(), task.description))
 
     def _reload(self) -> None:
         self._load_day(self.today.current_date)
@@ -597,6 +735,28 @@ def _safe_day_start(text: str) -> int:
         return min(parse_day_start_minutes(text), 6 * 60)
     except ValueError:
         return 0
+
+
+_BANG_TAIL = re.compile(r"(!{1,3})\s*$")
+
+
+def _insert_recurrence(body: str, rule: str) -> str:
+    """Append '🔁 <rule>' before any trailing priority bangs."""
+    token = f"🔁 {rule}"
+    m = _BANG_TAIL.search(body)
+    if m:
+        head = body[: m.start()].rstrip()
+        return f"{head} {token} {m.group(1)}"
+    return f"{body.rstrip()} {token}" if body.strip() else token
+
+
+def _insert_due(body: str, due: date) -> str:
+    """Append '📅 YYYY-MM-DD' keeping trailing !/!!/!!! bangs last."""
+    token = f"📅 {due.isoformat()}"
+    m = _BANG_TAIL.search(body)
+    if m:
+        return f"{body[: m.start()].rstrip()} {token} {m.group(1)}"
+    return f"{body} {token}"
 
 
 def _version_str() -> str:

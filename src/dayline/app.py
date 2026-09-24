@@ -49,17 +49,47 @@ def configure_logging() -> None:
     )
 
 
+def load_bundled_fonts() -> None:
+    """Register the design fonts (Varela Round / Wallpoet / LEMON MILK) with Qt.
+
+    The paper design system binds to these families by name (Theme.qml);
+    Segoe UI stays as the fallback if a file is missing."""
+    from PySide6.QtGui import QFontDatabase
+
+    fonts_dir = qml_dir().parent / "assets" / "fonts"
+    if not fonts_dir.is_dir():  # pragma: no cover - dev tree always has them
+        return
+    log = logging.getLogger("dayline.app")
+    files = sorted(fonts_dir.glob("*.ttf")) + sorted(fonts_dir.glob("*.otf"))
+    for f in files:
+        if QFontDatabase.addApplicationFont(str(f)) == -1:
+            log.warning("could not load bundled font %s", f.name)
+
+
 def create_engine() -> tuple[QQmlApplicationEngine, AppViewModel]:
     """Create the QML engine with the App context property set. The caller
     must keep the returned engine and viewmodel alive for the UI lifetime."""
     QQuickStyle.setStyle("Basic")
+    load_bundled_fonts()
 
     cfg_path = config_file()
     settings, _issues = load_settings(cfg_path)
-    vm = AppViewModel(settings, config_path=cfg_path)
+
+    from dayline.platform.sound import play_wav
+
+    snap_wav = qml_dir().parent / "assets" / "snap.wav"
+    vm = AppViewModel(settings, config_path=cfg_path, sound_play=lambda: play_wav(snap_wav))
 
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("App", vm)
+    # Tray-first: skip the window from the very first frame when the user
+    # opted in AND a vault is configured AND a tray exists to return to.
+    from PySide6.QtWidgets import QSystemTrayIcon
+
+    start_hidden = bool(
+        settings.start_hidden and settings.vault_path and QSystemTrayIcon.isSystemTrayAvailable()
+    )
+    engine.rootContext().setContextProperty("StartHidden", start_hidden)
     root = qml_dir()
     engine.addImportPath(str(root))
     engine.load(QUrl.fromLocalFile(str(root / "Main.qml")))
@@ -112,9 +142,14 @@ def main(argv: list[str] | None = None) -> int:
     from dayline.platform.single_instance import SingleInstance
 
     pending_show = {"v": False}
+    controller_ref: dict[str, Any] = {"c": None}
 
     def _second_launch() -> None:
-        pending_show["v"] = True
+        ctrl = controller_ref["c"]
+        if ctrl is not None:
+            ctrl.show_window()  # already running (often tray-hidden) → surface it
+        else:
+            pending_show["v"] = True  # raced ahead of startup; handled below
 
     si = SingleInstance(_second_launch)
     if not args.selftest and not si.acquire():
@@ -129,16 +164,25 @@ def main(argv: list[str] | None = None) -> int:
     vm.start()
     window: Any = roots[0]
 
+    # window/taskbar icon = the exact brand logo
+    from PySide6.QtGui import QIcon
+
+    window.setIcon(QIcon(str(qml_dir().parent / "assets" / "app.png")))
+
     if args.selftest:
         ok = window.objectName() == "rootWindow" and bool(window.property("qmlReady"))
         _report(f"selftest: qml_loaded={'ok' if ok else 'failed'}")
         return 0 if ok else 1
 
     controller = _integrate_windows(app, engine, vm, window)
+    controller_ref["c"] = controller
     if args.minimized:
         window.hide()
     elif pending_show["v"]:
-        controller.toggle_window()
+        controller.show_window()
+    if not window.isVisible() and getattr(controller, "_tray", None) is not None:
+        # tray-first boot: tell the user where the app went (once per run)
+        controller._tray.notify("Dayline", "Running in the tray — click the icon to open.")
 
     rc = app.exec()
     si.shutdown()
@@ -197,6 +241,7 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
 
     controller.apply_titlebar_theme()
     controller.apply_backdrop()
+    controller.apply_corner_style()  # static Win11 preference
     vm.changed.connect(controller.apply_titlebar_theme)
     vm.changed.connect(controller.apply_backdrop)
     vm.settingsVM.applied.connect(_on_settings)

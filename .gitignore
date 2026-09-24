@@ -21,3 +21,6 @@ dist/
 Thumbs.db
 Desktop.ini
 packaging/version_info.txt
+
+# Local scratch (debug scripts, config backups — never commit)
+scratch/

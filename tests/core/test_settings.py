@@ -18,7 +18,9 @@ from dayline.core.settings import (
 def test_missing_file_gives_defaults(tmp_path: Path) -> None:
     s, issues = load(tmp_path / "config.json")
     assert issues == []
-    assert s.lookback == 30 and s.theme == "system" and s.heading == "## To-Do"
+    assert s.lookback == 30 and s.theme == "light" and s.heading == "## To-Do"
+    # tray-first defaults: boot to tray, close hides to tray
+    assert s.start_hidden is True and s.close_to_tray is True
 
 
 def test_save_load_roundtrip(tmp_path: Path) -> None:
@@ -42,7 +44,7 @@ def test_unknown_keys_ignored_wrong_types_kept_default(tmp_path: Path) -> None:
     p = tmp_path / "config.json"
     p.write_text(json.dumps({"lookback": "many", "theme": 5, "future_key": True}), encoding="utf-8")
     s, _ = load(p)
-    assert s.lookback == 30 and s.theme == "system"
+    assert s.lookback == 30 and s.theme == "light"
 
 
 def test_validate_clamps_and_reports() -> None:
@@ -95,3 +97,73 @@ def test_time_fields_validated() -> None:
     s = Settings(morning_summary_at="25:99")
     issues = validate(s)
     assert s.morning_summary_at == "" and issues
+
+
+def test_auto_hide_defaults_off() -> None:
+    s = Settings()
+    assert s.auto_hide is False
+
+
+def test_due_reminders_default_on() -> None:
+    s = Settings()
+    assert s.notifications_enabled is True
+    assert s.morning_summary_at == "09:00"
+
+
+def test_migrate_v1_enables_reminders_for_legacy_configs() -> None:
+    from dayline.core.settings import migrate
+
+    legacy = {"schema_version": 1, "notifications_enabled": False, "morning_summary_at": ""}
+    out = migrate(legacy)
+    assert out["notifications_enabled"] is True
+    assert out["morning_summary_at"] == "09:00"
+    assert out["schema_version"] == 2
+
+
+def test_migrate_v1_respects_deliberate_evening_only_setup() -> None:
+    from dayline.core.settings import migrate
+
+    raw = {"schema_version": 1, "notifications_enabled": True, "morning_summary_at": ""}
+    out = migrate(raw)
+    assert out["notifications_enabled"] is True
+    assert out["morning_summary_at"] == ""  # untouched: user had chosen times
+
+
+def test_thin_paper_defaults_off() -> None:
+    assert Settings().thin_paper is False
+
+
+def test_thin_paper_roundtrips_through_coerce(tmp_path: Path) -> None:
+    s = Settings(thin_paper=True)
+    save(tmp_path / "config.json", s)
+    loaded, _ = load(tmp_path / "config.json")
+    assert loaded.thin_paper is True
+
+
+def test_vault_mode_defaults_to_obsidian() -> None:
+    assert Settings().vault_mode == "obsidian"
+
+
+def test_vault_mode_roundtrips_through_coerce(tmp_path: Path) -> None:
+    s = Settings(vault_mode="folder")
+    save(tmp_path / "config.json", s)
+    loaded, _ = load(tmp_path / "config.json")
+    assert loaded.vault_mode == "folder"
+
+
+def test_vault_mode_missing_in_old_config_defaults_obsidian(tmp_path: Path) -> None:
+    # configs saved before folder mode existed must load as obsidian
+    import json
+
+    p = tmp_path / "config.json"
+    data = {"schema_version": 2, "vault_path": "C:/vault"}
+    p.write_text(json.dumps(data), encoding="utf-8")
+    loaded, _ = load(p)
+    assert loaded.vault_mode == "obsidian"
+
+
+def test_vault_mode_invalid_clamped_by_validate() -> None:
+    s = Settings(vault_mode="notion")
+    issues = validate(s)
+    assert s.vault_mode == "obsidian"
+    assert any("vault_mode" in i for i in issues)

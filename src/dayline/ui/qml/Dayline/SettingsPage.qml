@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Dayline
 
-// Settings (PRD §3.7): grouped cards, all changes apply live.
+// Settings (PRD §3.7): grouped cards, all changes apply live. shadcn styling.
 Item {
     id: page
     required property var vm      // App.settingsVM
@@ -17,14 +17,15 @@ Item {
         Column {
             id: col
             x: Theme.s24
+            y: Theme.ribbonOverhang
             width: page.width - 2 * Theme.s24
             spacing: Theme.s16
 
             Text {
                 text: "Settings"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.titlePx
-                font.weight: Font.DemiBold
+                font.family: Theme.serifFamily
+                font.pixelSize: Theme.titlePx + 2
+                font.weight: Theme.weightHeading
                 color: Theme.text
             }
 
@@ -32,21 +33,21 @@ Item {
             Card {
                 title: "Appearance"
                 SettingRow { label: "Theme" }
-                ComboBox {
+                Select {
                     width: parent.width
                     model: ["system", "light", "dark"]
                     currentIndex: ["system", "light", "dark"].indexOf(page.vm.theme)
                     onActivated: page.vm.setTheme(currentText)
                 }
                 SettingRow { label: "Sort tasks by" }
-                ComboBox {
+                Select {
                     width: parent.width
                     model: ["priority", "manual"]
                     currentIndex: page.vm.sortMode === "manual" ? 1 : 0
                     onActivated: page.vm.setSortMode(currentText)
                 }
                 SettingRow { label: "Week starts on" }
-                ComboBox {
+                Select {
                     width: parent.width
                     model: ["Monday", "Sunday"]
                     currentIndex: page.vm.weekStart === "sun" ? 1 : 0
@@ -56,11 +57,24 @@ Item {
                     width: parent.width
                     visible: page.app && page.app.micaSupported
                     SettingRow { label: "Mica backdrop"; width: parent.width - micw.width }
-                    Switch {
+                    Toggle {
                         id: micw
                         anchors.verticalCenter: parent.verticalCenter
                         checked: page.vm.mica
-                        onToggled: page.vm.setMica(checked)
+                        onToggled: page.vm.setMica(!checked)
+                    }
+                }
+                Row {
+                    width: parent.width
+                    visible: page.app && page.app.micaSupported
+                    SettingRow {
+                        label: "Thin paper (translucent)"; width: parent.width - tpw.width
+                    }
+                    Toggle {
+                        id: tpw
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.thinPaper
+                        onToggled: page.vm.setThinPaper(!checked)
                     }
                 }
             }
@@ -77,8 +91,8 @@ Item {
                     width: parent.width
                     height: warn.implicitHeight + Theme.s16
                     radius: Theme.radiusControl
-                    color: Theme.dark ? "#3A2324" : "#FDECEC"
-                    border.color: Theme.danger
+                    color: Qt.alpha(Theme.danger, Theme.dark ? 0.16 : 0.08)
+                    border.color: Qt.alpha(Theme.danger, 0.4)
                     border.width: 1
                     Text {
                         id: warn
@@ -111,11 +125,11 @@ Item {
                 Row {
                     width: parent.width
                     SettingRow { label: "Auto carry-over"; width: parent.width - sw.width }
-                    Switch {
+                    Toggle {
                         id: sw
                         anchors.verticalCenter: parent.verticalCenter
                         checked: page.vm.rolloverEnabled
-                        onToggled: page.vm.setRolloverEnabled(checked)
+                        onToggled: page.vm.setRolloverEnabled(!checked)
                     }
                 }
                 SettingRow { label: "Lookback (days): " + page.vm.lookback }
@@ -125,6 +139,29 @@ Item {
                     from: 1; to: 90; stepSize: 1
                     value: page.vm.lookback
                     onMoved: page.vm.setLookback(Math.round(value))
+                    implicitHeight: 20
+                    background: Rectangle {
+                        x: lb.leftPadding
+                        y: lb.topPadding + lb.availableHeight / 2 - height / 2
+                        width: lb.availableWidth
+                        height: 6
+                        radius: 3
+                        color: Theme.surfaceAlt
+                        Rectangle {
+                            width: lb.visualPosition * parent.width
+                            height: parent.height
+                            radius: 3
+                            color: Theme.accent
+                        }
+                    }
+                    handle: Rectangle {
+                        x: lb.leftPadding + lb.visualPosition * (lb.availableWidth - width)
+                        y: lb.topPadding + lb.availableHeight / 2 - height / 2
+                        width: 18; height: 18; radius: 9
+                        color: Theme.surface
+                        border.color: Theme.accent
+                        border.width: 2
+                    }
                 }
                 ActionButton {
                     text: "Run carry-over now"
@@ -137,22 +174,64 @@ Item {
                 title: "General"
                 Row {
                     width: parent.width
+                    SettingRow { label: "Start hidden in tray"; width: parent.width - sh.width }
+                    Toggle {
+                        id: sh
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.startHidden
+                        onToggled: page.vm.setStartHidden(!checked)
+                    }
+                }
+                Row {
+                    width: parent.width
                     SettingRow { label: "Close to tray"; width: parent.width - ctt.width }
-                    Switch {
+                    Toggle {
                         id: ctt
                         anchors.verticalCenter: parent.verticalCenter
                         checked: page.vm.closeToTray
-                        onToggled: page.vm.setCloseToTray(checked)
+                        onToggled: page.vm.setCloseToTray(!checked)
+                    }
+                }
+                Row {
+                    width: parent.width
+                    SettingRow {
+                        label: "Auto-hide when unfocused"; width: parent.width - ah.width
+                    }
+                    Toggle {
+                        id: ah
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.autoHide
+                        onToggled: page.vm.setAutoHide(!checked)
+                    }
+                }
+                Row {
+                    width: parent.width
+                    SettingRow { label: "Daily due reminder (9:00)"; width: parent.width - dr.width }
+                    Toggle {
+                        id: dr
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.dueReminders
+                        onToggled: page.vm.setDueReminders(!checked)
+                    }
+                }
+                Row {
+                    width: parent.width
+                    SettingRow { label: "Completion sound"; width: parent.width - csd.width }
+                    Toggle {
+                        id: csd
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: page.vm.completionSound
+                        onToggled: page.vm.setCompletionSound(!checked)
                     }
                 }
                 Row {
                     width: parent.width
                     SettingRow { label: "Start with Windows"; width: parent.width - asw.width }
-                    Switch {
+                    Toggle {
                         id: asw
                         anchors.verticalCenter: parent.verticalCenter
                         checked: page.vm.autostart
-                        onToggled: page.vm.setAutostart(checked)
+                        onToggled: page.vm.setAutostart(!checked)
                     }
                 }
                 Labeled { label: "Global quick-add"; value: page.vm.hotkey }
@@ -164,11 +243,11 @@ Item {
                 Row {
                     width: parent.width
                     SettingRow { label: "Auto-check (daily)"; width: parent.width - uc.width }
-                    Switch {
+                    Toggle {
                         id: uc
                         anchors.verticalCenter: parent.verticalCenter
                         checked: page.vm.updateCheckEnabled
-                        onToggled: page.vm.setUpdateCheckEnabled(checked)
+                        onToggled: page.vm.setUpdateCheckEnabled(!checked)
                     }
                 }
                 Text {
@@ -198,6 +277,7 @@ Item {
                     visible: page.app && page.app.updateAvailable
                     spacing: Theme.s8
                     ActionButton {
+                        variant: "default"
                         text: "Install update"
                         onClicked: if (page.app) page.app.installUpdate()
                     }
@@ -212,11 +292,22 @@ Item {
             // ---- About -----------------------------------------------------
             Card {
                 title: "About"
-                Text {
-                    text: "Dayline " + page.vm.version
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.bodyPx
+                Row {
+                    spacing: Theme.s12
+                    Image {
+                        source: "../../assets/app.png"
+                        sourceSize.width: 40
+                        sourceSize.height: 40
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Dayline " + page.vm.version
+                        color: Theme.text
+                        font.family: Theme.serifFamily
+                        font.pixelSize: Theme.bodyPx + 2
+                        font.weight: Theme.weightHeading
+                    }
                 }
                 Text {
                     width: parent.width

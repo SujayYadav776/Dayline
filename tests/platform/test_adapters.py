@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import pytest
 
+from dayline.platform import dwm
 from dayline.platform.autostart import (
     RUN_NAME,
     Autostart,
     FakeReg,
     command_for,
 )
-from dayline.platform.dwm import set_mica_backdrop, supports_system_backdrop
+from dayline.platform.dwm import set_mica_backdrop, set_rounded_corners, supports_system_backdrop
 from dayline.platform.hotkey import (
     MOD_ALT,
     MOD_CONTROL,
@@ -93,3 +94,15 @@ def test_supports_system_backdrop_off_win11(build: int) -> None:
 def test_mica_backdrop_noop_without_hwnd() -> None:
     assert set_mica_backdrop(0, True) is False
     assert set_mica_backdrop(0, False) is False
+
+
+# ---- rounded corners (Win11 DWM clip) ---------------------------------------
+def test_rounded_corners_noop_without_hwnd() -> None:
+    assert set_rounded_corners(0) is False
+    assert set_rounded_corners(0, False) is False
+
+
+def test_rounded_corners_degrades_off_win11(monkeypatch: pytest.MonkeyPatch) -> None:
+    # even with a fake hwnd, a non-Win11 build must not touch DWM
+    monkeypatch.setattr(dwm, "supports_system_backdrop", lambda build=None: False)
+    assert set_rounded_corners(1234) is False

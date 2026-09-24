@@ -63,7 +63,11 @@ class SettingsViewModel(QObject):
     sortMode = Property(str, lambda self: self._s.sort_mode, notify=changed)
     weekStart = Property(str, lambda self: self._s.week_start, notify=changed)
     mica = Property(bool, lambda self: self._s.mica, notify=changed)
+    thinPaper = Property(bool, lambda self: self._s.thin_paper, notify=changed)
     closeToTray = Property(bool, lambda self: self._s.close_to_tray, notify=changed)
+    startHidden = Property(bool, lambda self: self._s.start_hidden, notify=changed)
+    autoHide = Property(bool, lambda self: self._s.auto_hide, notify=changed)
+    completionSound = Property(bool, lambda self: self._s.completion_sound, notify=changed)
     autostart = Property(bool, lambda self: self._s.autostart, notify=changed)
     hotkey = Property(str, lambda self: self._s.hotkey, notify=changed)
     quickAddEnabled = Property(bool, lambda self: self._s.quick_add_enabled, notify=changed)
@@ -127,8 +131,20 @@ class SettingsViewModel(QObject):
         self._set("mica", value, "appearance")
 
     @Slot(bool)
+    def setThinPaper(self, value: bool) -> None:
+        self._set("thin_paper", value, "appearance")
+
+    @Slot(bool)
     def setCloseToTray(self, value: bool) -> None:
         self._set("close_to_tray", value, "general")
+
+    @Slot(bool)
+    def setStartHidden(self, value: bool) -> None:
+        self._set("start_hidden", value, "general")
+
+    @Slot(bool)
+    def setCompletionSound(self, value: bool) -> None:
+        self._set("completion_sound", value, "general")
 
     @Slot(bool)
     def setAutostart(self, value: bool) -> None:
@@ -149,6 +165,20 @@ class SettingsViewModel(QObject):
     @Slot(bool)
     def setNotificationsEnabled(self, value: bool) -> None:
         self._set("notifications_enabled", value, "notifications")
+
+    # "Daily due reminder" switch in Settings → General: drives the morning
+    # scheduler and guarantees a time when switched back on.
+    dueReminders = Property(bool, lambda self: self._s.notifications_enabled, notify=changed)
+
+    @Slot(bool)
+    def setDueReminders(self, value: bool) -> None:
+        if value and not self._s.morning_summary_at:
+            self._s.morning_summary_at = "09:00"
+        self._set("notifications_enabled", value, "notifications")
+
+    @Slot(bool)
+    def setAutoHide(self, value: bool) -> None:
+        self._set("auto_hide", value, "general")
 
     @Slot(str)
     def setMorningAt(self, value: str) -> None:

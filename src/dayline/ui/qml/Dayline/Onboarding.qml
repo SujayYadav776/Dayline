@@ -10,17 +10,41 @@ Item {
     property var vm: app.settingsVM
     property int step: 0
     property string chosenPath: vm.vaultPath || ""
+    property bool folderPick: false  // step 1: skip Obsidian, use any folder
 
     readonly property var vaults: app.detectedVaults
 
     function finish() {
         if (chosenPath.length === 0) return
-        app.selectVault(chosenPath)   // persists + builds store + starts
+        if (folderPick)
+            app.selectFolder(chosenPath)  // persists + builds store + starts
+        else
+            app.selectVault(chosenPath)   // persists + builds store + starts
     }
 
     Column {
         anchors.fill: parent
         spacing: Theme.s24
+
+        // brand mark (exact logo)
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.s12
+            Image {
+                source: "../../assets/app.png"
+                sourceSize.width: 44
+                sourceSize.height: 44
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Dayline"
+                font.family: Theme.serifFamily
+                font.pixelSize: 24
+                font.weight: Theme.weightHeading
+                color: Theme.text
+            }
+        }
 
         // progress dots
         Row {
@@ -44,21 +68,60 @@ Item {
                 text: "Where do your daily notes live?"
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.titlePx
-                font.weight: Font.DemiBold
+                font.weight: Theme.weightHeading
+                font.letterSpacing: Theme.titleTracking
                 color: Theme.text
                 wrapMode: Text.Wrap
                 width: parent.width
             }
             Text {
-                text: "Dayline edits only the To-Do section of your daily notes."
+                text: ob.folderPick
+                      ? "Pick any folder — Dayline stores your daily notes there\nas plain markdown (Daily/2026-09-24.md style). No Obsidian needed."
+                      : "Dayline edits only the To-Do section of your daily notes."
                 color: Theme.textSecondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.bodyPx
                 wrapMode: Text.Wrap
                 width: parent.width
             }
+            // source mode: Obsidian vault (default) or any plain folder
+            Row {
+                id: chipRow
+                width: parent.width
+                spacing: Theme.s8
+                Repeater {
+                    model: [
+                        {"id": "obsidian", "label": "Obsidian vault"},
+                        {"id": "folder", "label": "Any folder"}
+                    ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: chipRow.width / 2 - Theme.s4
+                        height: 34
+                        radius: Theme.radiusControl
+                        color: (ob.folderPick === (modelData.id === "folder")) ? Theme.surfaceAlt : Theme.surface
+                        border.color: (ob.folderPick === (modelData.id === "folder")) ? Theme.accent : Theme.border
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.label
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.captionPx
+                            font.weight: Theme.weightLabel
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: ob.folderPick = modelData.id === "folder"
+                        }
+                        Accessible.role: Accessible.Button
+                        Accessible.name: "Use " + modelData.label
+                    }
+                }
+            }
             Repeater {
-                model: ob.vaults
+                model: ob.folderPick ? [] : ob.vaults
                 delegate: Rectangle {
                     required property var modelData
                     width: parent.width
@@ -103,7 +166,8 @@ Item {
                 height: 36
                 radius: Theme.radiusControl
                 color: Theme.surface
-                border.color: Theme.border
+                border.color: pathField.activeFocus ? Theme.ring : Theme.input
+                border.width: pathField.activeFocus ? Theme.ringWidth : 1
                 TextInput {
                     id: pathField
                     anchors.fill: parent
@@ -128,7 +192,8 @@ Item {
                 text: "Confirm your daily-note setup"
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.titlePx
-                font.weight: Font.DemiBold
+                font.weight: Theme.weightHeading
+                font.letterSpacing: Theme.titleTracking
                 color: Theme.text
                 wrapMode: Text.Wrap
                 width: parent.width
@@ -136,8 +201,11 @@ Item {
             SettingRow { label: "Folder" }
             Rectangle {
                 width: parent.width; height: 36; radius: Theme.radiusControl
-                color: Theme.surface; border.color: Theme.border
+                color: Theme.surface
+                border.color: folderField.activeFocus ? Theme.ring : Theme.input
+                border.width: folderField.activeFocus ? Theme.ringWidth : 1
                 TextInput {
+                    id: folderField
                     anchors.fill: parent; anchors.margins: Theme.s12
                     verticalAlignment: TextInput.AlignVCenter; clip: true
                     text: ob.vm.folder
@@ -148,8 +216,11 @@ Item {
             SettingRow { label: "Date format" }
             Rectangle {
                 width: parent.width; height: 36; radius: Theme.radiusControl
-                color: Theme.surface; border.color: Theme.border
+                color: Theme.surface
+                border.color: formatField.activeFocus ? Theme.ring : Theme.input
+                border.width: formatField.activeFocus ? Theme.ringWidth : 1
                 TextInput {
+                    id: formatField
                     anchors.fill: parent; anchors.margins: Theme.s12
                     verticalAlignment: TextInput.AlignVCenter; clip: true
                     text: ob.vm.dateFormat
@@ -176,18 +247,19 @@ Item {
                 text: "Almost done"
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.titlePx
-                font.weight: Font.DemiBold
+                font.weight: Theme.weightHeading
+                font.letterSpacing: Theme.titleTracking
                 color: Theme.text
             }
             Row {
                 width: parent.width
                 SettingRow { label: "Start with Windows"; width: parent.width - s1.width }
-                Switch { id: s1; anchors.verticalCenter: parent.verticalCenter; checked: ob.vm.autostart; onToggled: ob.vm.setAutostart(checked) }
+                Toggle { id: s1; anchors.verticalCenter: parent.verticalCenter; checked: ob.vm.autostart; onToggled: ob.vm.setAutostart(!checked) }
             }
             Row {
                 width: parent.width
                 SettingRow { label: "Enable global quick-add"; width: parent.width - s2.width }
-                Switch { id: s2; anchors.verticalCenter: parent.verticalCenter; checked: ob.vm.quickAddEnabled; onToggled: ob.vm.setQuickAddEnabled(checked) }
+                Toggle { id: s2; anchors.verticalCenter: parent.verticalCenter; checked: ob.vm.quickAddEnabled; onToggled: ob.vm.setQuickAddEnabled(!checked) }
             }
         }
 
@@ -207,6 +279,7 @@ Item {
             ActionButton {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                variant: "default"
                 text: ob.step === 2 ? "Get started" : "Next"
                 enabled: ob.step !== 0 || ob.chosenPath.length > 0
                 onClicked: {

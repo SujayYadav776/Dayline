@@ -58,13 +58,35 @@ class AppController(QObject):
         else:
             self._show_and_raise()
 
+    def show_window(self) -> None:
+        """Surface the window (used by a second launch while tray-resident)."""
+        self._show_and_raise()
+
     def _show_and_raise(self) -> None:
+        self._anchor_bottom_right()
         self._window.show()
         try:
             self._window.raise_()
             self._window.requestActivate()
         except AttributeError:  # pragma: no cover - depends on backend
             pass
+
+    def _anchor_bottom_right(self, margin: int = 12) -> None:
+        """Notification-center style: dock the window to the bottom-right of
+        the work area (taskbar excluded) each time it is summoned."""
+        try:
+            screen = self._window.screen()
+            if screen is None:  # pragma: no cover - only pre-show on some platforms
+                from PySide6.QtWidgets import QApplication
+
+                screen = QApplication.primaryScreen()
+            avail = screen.availableGeometry()
+            w = int(self._window.width())
+            h = int(self._window.height())
+            self._window.setX(avail.x() + max(0, avail.width() - w - margin))
+            self._window.setY(avail.y() + max(0, avail.height() - h - margin))
+        except (AttributeError, TypeError) as exc:  # headless fakes: skip quietly
+            log.debug("bottom-right anchor skipped: %s", exc)
 
     def should_suppress_close(self) -> bool:
         """Close-to-tray: hide instead of quit, unless we're really quitting."""
@@ -103,6 +125,16 @@ class AppController(QObject):
         except (AttributeError, TypeError):
             return
         set_mica_backdrop(hwnd, bool(self._vm.micaActive))
+
+    # -- Win11 rounded corners ---------------------------------------------------
+    def apply_corner_style(self) -> None:
+        from dayline.platform.dwm import set_rounded_corners
+
+        try:
+            hwnd = int(self._window.winId())
+        except (AttributeError, TypeError):
+            return
+        set_rounded_corners(hwnd, True)
 
     # -- global hotkey ---------------------------------------------------------
     def bind_hotkey(self) -> bool:
@@ -180,7 +212,16 @@ class AppController(QObject):
                 "Dayline", f"{left} task(s) still open today." if left else "All done today."
             )
         else:
-            self._tray.notify("Dayline", "Good morning — plan your day.")
+            due, over = self._vm.due_summary()
+            if due == 0 and over == 0:
+                self._tray.notify("Dayline", "Nothing due today — all clear.")
+            else:
+                parts = []
+                if due:
+                    parts.append(f"{due} due today")
+                if over:
+                    parts.append(f"{over} overdue")
+                self._tray.notify("Dayline", " · ".join(parts))
 
     # -- slots for QML ---------------------------------------------------------
     @Slot(result=bool)

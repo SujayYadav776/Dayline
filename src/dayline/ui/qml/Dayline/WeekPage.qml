@@ -9,6 +9,7 @@ Item {
 
     Column {
         anchors.fill: parent
+        anchors.topMargin: Theme.ribbonOverhang
         anchors.leftMargin: Theme.s24
         anchors.rightMargin: Theme.s24
         spacing: Theme.s16
@@ -27,8 +28,10 @@ Item {
                     delegate: Rectangle {
                         width: 32; height: 32
                         radius: Theme.radiusControl
-                        color: Theme.surface
-                        border.color: Theme.border
+                        color: wnavBtn.containsMouse ? Theme.surfaceAlt : Theme.surface
+                        border.color: Theme.input
+                        border.width: 1
+                        Behavior on color { enabled: Theme.animate; ColorAnimation { duration: Theme.motionMs } }
                         Text {
                             anchors.centerIn: parent
                             text: modelData
@@ -37,7 +40,9 @@ Item {
                             font.pixelSize: 16
                         }
                         MouseArea {
+                            id: wnavBtn
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: modelData === "‹" ? page.vm.prevWeek() : page.vm.nextWeek()
                         }
@@ -51,9 +56,9 @@ Item {
                 anchors.leftMargin: Theme.s12
                 anchors.verticalCenter: parent.verticalCenter
                 text: page.vm.rangeLabel
-                font.family: Theme.fontFamily
+                font.family: Theme.serifFamily
                 font.pixelSize: Theme.titlePx
-                font.weight: Font.DemiBold
+                font.weight: Theme.weightHeading
                 color: Theme.text
             }
             Rectangle {
@@ -210,7 +215,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: modelData.day
-                            color: modelData.percent > 55 ? Theme.onAccent : Theme.textSecondary
+                            color: modelData.percent > 55 ? Theme.accentInk : Theme.textSecondary
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.captionPx
                         }

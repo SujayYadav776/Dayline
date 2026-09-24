@@ -51,6 +51,7 @@ def capture(
     settings: Settings,
     out: Path,
     prepare: Callable[[AppViewModel], None] | None = None,
+    post: Callable[[object], None] | None = None,
 ) -> bool:
     theme = settings.theme if settings.theme in ("light", "dark") else "light"
     vm = AppViewModel(settings, theme_probe=lambda: theme)
@@ -70,6 +71,9 @@ def capture(
         if prepare:
             prepare(vm)
             spin(app)
+        if post:
+            post(win)
+            spin(app)
         out.parent.mkdir(parents=True, exist_ok=True)
         pix = win.grabWindow()
         ok = (not pix.isNull()) and pix.save(str(out))
@@ -82,6 +86,7 @@ def capture(
 def main() -> int:
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication.instance() or QGuiApplication(sys.argv)
+    dayline_app.load_bundled_fonts()
     outdir = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "dist" / "screenshots"
     results: list[tuple[str, bool]] = []
     with tempfile.TemporaryDirectory() as td:
@@ -133,6 +138,17 @@ def main() -> int:
                     vs(theme="light"),
                     outdir / "settings.png",
                     prepare=lambda vm: vm.setPage("settings"),
+                ),
+            )
+        )
+        results.append(
+            (
+                "progress",
+                capture(
+                    app,
+                    vs(theme="light"),
+                    outdir / "progress.png",
+                    post=lambda win: win.setProperty("progressOpen", True),
                 ),
             )
         )

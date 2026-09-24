@@ -2,7 +2,8 @@ import QtQuick
 import Dayline
 
 // One task line: priority dot, checkbox, inline-editable text, metadata chips,
-// and hover actions. Mutations route through the App context property (FR-T1..T5).
+// hover actions (edit / move-to-day / priority / delete) and the completion
+// micro-animation. Mutations route through the App context property (FR-T1..T5).
 Rectangle {
     id: row
     required property var task        // row dict from the viewmodel
@@ -10,11 +11,28 @@ Rectangle {
     property bool dimmed: false
     property bool selected: false
     property bool editing: false
+    property bool celebrate: false    // play the tick-pop once (set by the page)
+    signal toggledFromOpen(int key)   // lets the page mark the row to celebrate
+    signal celebrateDone()            // page clears its celebrate key
 
     radius: Theme.radiusControl
     color: selected ? Theme.surfaceAlt : "transparent"
     height: content.implicitHeight + Theme.s8
     opacity: dimmed ? 0.62 : 1.0
+
+    Component.onCompleted: {
+        // the spring checkbox replays itself via animateIn; the old celebration
+        // pulse ring ("wave") was removed by user request
+        if (celebrate) Qt.callLater(row.celebrateDone)
+    }
+
+    // single-click delay so a double-click (jump to Obsidian) doesn't also
+    // open the inline editor
+    Timer {
+        id: editTimer
+        interval: 280
+        onTriggered: row.beginEdit()
+    }
 
     function cyclePriority() {
         var order = ["", "high", "medium", "low"]
@@ -41,8 +59,11 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.s8
 
-        // priority dot (click to cycle) — also exposed via Accessible.name text
+        // priority dot — only shown when a priority exists (the empty grey
+        // circle was noise; without it the checkbox leads the row and the
+        // completion ring clearly originates from the tick box)
         Rectangle {
+            visible: !!task.priority
             width: 20
             height: 20
             radius: 10
@@ -53,9 +74,7 @@ Rectangle {
                 width: 10
                 height: 10
                 radius: 5
-                color: task.priority ? Theme.prioColor(task.priority) : "transparent"
-                border.color: task.priority ? color : Theme.prioNone
-                border.width: task.priority ? 0 : 1.5
+                color: Theme.prioColor(task.priority)
             }
             MouseArea {
                 anchors.fill: parent
@@ -63,38 +82,21 @@ Rectangle {
                 onClicked: row.cyclePriority()
             }
             Accessible.role: Accessible.Button
-            Accessible.name: "Priority: " + (task.priority || "none")
+            Accessible.name: "Priority: " + task.priority
         }
 
-        // checkbox
-        Rectangle {
+        // checkbox — SpringCheck port: spring fill swell + self-drawn tick
+        SpringBox {
             id: box
-            width: 18
-            height: 18
-            radius: 5
             anchors.verticalCenter: parent.verticalCenter
             visible: row.showChecks
-            property bool doneFill: task.statusKind === "done"
-            color: doneFill ? Theme.accent : "transparent"
-            border.color: doneFill ? Theme.accent : Theme.prioNone
-            border.width: 1.5
-            Text {
-                anchors.centerIn: parent
-                visible: box.doneFill
-                text: "✓"
-                color: Theme.onAccent
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                font.weight: Font.Bold
+            on: task.statusKind === "done"
+            animateIn: row.celebrate
+            accessName: task.description
+            onClicked: {
+                if (!box.on) row.toggledFromOpen(task.taskKey)
+                App.toggleTask(task.taskKey)
             }
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: App.toggleTask(task.taskKey)
-            }
-            Accessible.role: Accessible.CheckBox
-            Accessible.name: task.description
-            Accessible.checked: box.doneFill
         }
 
         Column {
@@ -109,14 +111,44 @@ Rectangle {
                 text: (task.statusKind === "moved" ? "→ " : "") + task.description
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.bodyPx
-                color: strikethrough ? Theme.textSecondary : Theme.text
                 wrapMode: Text.Wrap
                 property bool strikethrough:
                     task.statusKind === "done" || task.statusKind === "cancelled"
-                font.strikeout: strikethrough
+                // SpringCheck word dim: ink fades to doneOpacity on the spring;
+                // the wipe rule handles the strike for single lines, wrapped
+                // labels keep the static strikeout (one rule can't cross lines)
+                readonly property bool springStrike:
+                    row.showChecks && task.statusKind === "done" && lineCount === 1
+                color: row.showChecks && task.statusKind === "done"
+                       ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b,
+                                 1 - (1 - Theme.doneOpacity) * box.held)
+                       : (strikethrough ? Theme.textSecondary : Theme.text)
+                font.strikeout: strikethrough && !springStrike
+
+                // strike-through wipe across exactly the label's width,
+                // lagging behind the fill (React's readings().rule)
+                Rectangle {
+                    visible: bodyText.springStrike
+                    x: 0
+                    y: bodyText.height * 0.54
+                    width: bodyText.paintedWidth * Math.min(1, Math.max(0,
+                               (box.held - Theme.strikeLag)
+                               / (Theme.ruleEnd - Theme.strikeLag)))
+                    height: Math.max(1.5, Math.round(Theme.bodyPx / 6) / 2)
+                    radius: 2
+                    color: Theme.text
+                    opacity: 0.55
+                }
                 MouseArea {
                     anchors.fill: parent
-                    onDoubleClicked: row.beginEdit()
+                    cursorShape: Qt.PointingHandCursor
+                    // single click → edit inline (debounced by editTimer);
+                    // double click cancels the editor and jumps to Obsidian
+                    onClicked: editTimer.restart()
+                    onDoubleClicked: {
+                        editTimer.stop()
+                        App.openTaskInObsidian(task.taskKey)
+                    }
                 }
             }
 
@@ -173,6 +205,7 @@ Rectangle {
             Repeater {
                 model: [
                     {"icon": "✎", "name": "Edit", "act": "edit"},
+                    {"icon": "📆", "name": "Move to day", "act": "move"},
                     {"icon": "", "name": "Priority", "act": "prio"},
                     {"icon": "✕", "name": "Delete", "act": "del"}
                 ]
@@ -195,6 +228,10 @@ Rectangle {
                         onClicked: {
                             if (modelData.act === "edit") row.beginEdit()
                             else if (modelData.act === "prio") row.cyclePriority()
+                            else if (modelData.act === "move") {
+                                var w = row.Window.window
+                                if (w) w.openMoveMenu(task.taskKey, task.description)
+                            }
                             else App.deleteTask(task.taskKey)
                         }
                     }

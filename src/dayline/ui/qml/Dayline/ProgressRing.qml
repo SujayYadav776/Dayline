@@ -69,7 +69,8 @@ Item {
             text: Math.round(root.value * 100) + "%"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.sectionPx
-            font.weight: Font.DemiBold
+            font.weight: Theme.weightHeading
+            font.letterSpacing: Theme.headingTracking
             color: Theme.text
         }
         Text {

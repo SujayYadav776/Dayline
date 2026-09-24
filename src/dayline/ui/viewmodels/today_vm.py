@@ -52,6 +52,10 @@ class TodayViewModel(QObject):
 
     day = Property(str, lambda self: self._day.strftime("%Y-%m-%d"), notify=dateChanged)
     dateLabel = Property(str, lambda self: self._day.strftime("%A, %d %B %Y"), notify=dateChanged)
+    # Big date block (mockup): lowercase weekday, plain day number, lowercase month.
+    dayName = Property(str, lambda self: self._day.strftime("%A").lower(), notify=dateChanged)
+    dayNum = Property(str, lambda self: str(self._day.day), notify=dateChanged)
+    monthName = Property(str, lambda self: self._day.strftime("%B").lower(), notify=dateChanged)
     isToday = Property(bool, lambda self: self._today_flag, notify=changed)
     progress = Property(float, _progress, notify=changed)
     percent = Property(int, lambda self: self._stats.percent, notify=changed)
@@ -63,6 +67,9 @@ class TodayViewModel(QObject):
     todoList = Property(list, lambda self: self._todo, notify=changed)
     doneList = Property(list, lambda self: self._done, notify=changed)
     carriedList = Property(list, lambda self: self._carried, notify=changed)
+    # One flat list for the Today page: open first, carried next, completed at
+    # the bottom (rendered ticked + struck-through, never in its own section).
+    tasksList = Property(list, lambda self: self._todo + self._carried + self._done, notify=changed)
     todoCount = Property(int, lambda self: len(self._todo), notify=changed)
     doneSectionCount = Property(int, lambda self: len(self._done), notify=changed)
     carriedSectionCount = Property(int, lambda self: len(self._carried), notify=changed)
@@ -110,6 +117,10 @@ class TodayViewModel(QObject):
 
     def open_count(self) -> int:
         return self._stats.open_count
+
+    def is_open(self, key: int) -> bool:
+        """True if the task key is currently in the open (to-do) list."""
+        return any(r["taskKey"] == key for r in self._todo)
 
     @property
     def is_today(self) -> bool:

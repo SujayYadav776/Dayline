@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 
 from dayline.core.errors import DaylineError
-from dayline.core.model import NoteDoc, Priority, Task
+from dayline.core.model import NoteDoc, Priority, StatusKind, Task
 from dayline.core.store import Store
 
 log = logging.getLogger("dayline.core.editor")
@@ -30,6 +30,9 @@ class StaleEditError(DaylineError):
 # FR-T8: trailing ! = low, !! = medium, !!! = high
 _QUICK_RE = re.compile(r"^(.*?)(!{1,3})$", re.DOTALL)
 _BANG_TO_PRIO = {1: Priority.LOW, 2: Priority.MEDIUM, 3: Priority.HIGH}
+
+# 📅 due-date token (Obsidian Tasks format), rewritten on cross-day moves
+_DUE_RE = re.compile(r"📅\s*\d{4}-\d{2}-\d{2}")
 
 
 def parse_quick_syntax(text: str) -> tuple[str, Priority | None]:
@@ -120,6 +123,11 @@ class TaskEditor:
         return self._apply(d, "add", fn)
 
     def toggle(self, d: date, key: int) -> Task | None:
+        """Flip a task's box. Completing a 🔁 recurring task also creates the
+        next instance in its due day's note — both files in ONE undo op."""
+        src_path = self.store.path_for(d)
+        src_before = src_path.read_bytes() if src_path.is_file() else None
+
         def fn(store: Store, day: date) -> Task | None:
             def mut(doc: NoteDoc) -> Task:
                 t = self._find(doc, key)
@@ -128,7 +136,46 @@ class TaskEditor:
 
             return store.mutate(day, mut)
 
-        return self._apply(d, "toggle", fn)
+        task = fn(self.store, d)
+        if task is None:
+            return None
+        snaps: list[_Snapshot] = []
+        src_after = src_path.read_bytes() if src_path.is_file() else None
+        if src_after is not None and src_after != src_before:
+            snaps.append(_Snapshot(src_path, src_before is not None, src_before, src_after))
+        if task.kind is StatusKind.DONE:
+            snaps.extend(self._spawn_recurring(d, task))
+        if snaps:
+            self.undo_stack.record(_Op("toggle", snaps))
+        return task
+
+    def _spawn_recurring(self, d: date, task: Task) -> list[_Snapshot]:
+        """After an open→done toggle: append the next 🔁 instance to its day's
+        note. Returns the extra file snapshot(s) for the caller's undo op."""
+        from dayline.core import recur
+
+        rule = recur.rule_of(task.body)
+        if not rule:
+            return []
+        due = recur.due_of(task.body)
+        base = max(due, d) if due else d  # never spawn in the past
+        nxt = recur.next_occurrence(rule, base)
+        if nxt is None or nxt == d:
+            return []
+        raw = f"{task.indent}{task.marker}{task.sep}[ ] {recur.next_body(task.body, nxt)}"
+        dst_path = self.store.path_for(nxt)
+        before = dst_path.read_bytes() if dst_path.is_file() else None
+        existed = before is not None
+
+        def _add(doc: NoteDoc) -> bool:
+            doc.add_task_lines([raw])
+            return True
+
+        self.store.mutate(nxt, _add)
+        after = dst_path.read_bytes() if dst_path.is_file() else None
+        if after is None or after == before:
+            return []
+        return [_Snapshot(dst_path, existed, before, after)]
 
     def set_status(self, d: date, key: int, ch: str) -> Task | None:
         def fn(store: Store, day: date) -> Task | None:
@@ -186,6 +233,47 @@ class TaskEditor:
 
         return self._apply(d, "move", fn)
 
+    def move_to_day(self, src: date, key: int, dst: date) -> Task | None:
+        """Reschedule: move a task's raw line between two daily notes.
+
+        A 📅 due date on the line is rewritten to ``dst``; the line is
+        otherwise copied verbatim. Both files are captured in ONE undo op.
+        """
+        if src == dst:
+            return None
+        src_path = self.store.path_for(src)
+        dst_path = self.store.path_for(dst)
+        src_before = src_path.read_bytes() if src_path.is_file() else None
+        dst_before = dst_path.read_bytes() if dst_path.is_file() else None
+        if src_before is None:
+            return None
+
+        raw = self._find(self.store.read_doc(src), key).render()
+        if _DUE_RE.search(raw):
+            raw = _DUE_RE.sub(f"📅 {dst.isoformat()}", raw)
+
+        def _del(doc: NoteDoc) -> bool:
+            doc.delete_task(self._find(doc, key))
+            return True
+
+        def _add(doc: NoteDoc) -> bool:
+            doc.add_task_lines([raw])
+            return True
+
+        self.store.mutate(src, _del)
+        self.store.mutate(dst, _add)
+
+        snaps: list[_Snapshot] = []
+        src_after = src_path.read_bytes() if src_path.is_file() else None
+        if src_after is not None and src_after != src_before:
+            snaps.append(_Snapshot(src_path, True, src_before, src_after))
+        dst_after = dst_path.read_bytes() if dst_path.is_file() else None
+        if dst_after is not None and dst_after != dst_before:
+            snaps.append(_Snapshot(dst_path, dst_before is not None, dst_before, dst_after))
+        if snaps:
+            self.undo_stack.record(_Op("move-day", snaps))
+        return None
+
     # -- undo / redo ----------------------------------------------------------
     def undo(self) -> bool:
         op = self.undo_stack.pop_undo()
@@ -202,7 +290,13 @@ class TaskEditor:
         applied: list[_Snapshot] = []
         for s in snaps:
             current = s.path.read_bytes() if s.path.is_file() else None
-            want = s.after if not forward else (s.before if s.existed_before else b"")
+            # The state we expect to be leaving (undo: `after`; redo: what
+            # undo wrote — the pre-image, or an empty managed doc for a note
+            # we created, since undo never deletes files).
+            if not forward:
+                want = s.after
+            else:
+                want = s.before if s.before is not None else self._empty_bytes(s.path)
             if current != want and not (want is None and current is None):
                 log.info("undo/redo stale for %s; skipping", s.path.name)
                 return False  # external edit since; abandon this step

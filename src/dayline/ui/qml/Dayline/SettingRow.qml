@@ -1,12 +1,15 @@
 import QtQuick
 
-// A small secondary label used above a control inside a settings card.
+// A small label used above/next to a control inside a settings card (shadcn Label).
 Text {
     required property string label
     width: parent ? parent.width : 0
     text: label
-    color: Theme.textSecondary
+    color: Theme.text
     font.family: Theme.fontFamily
-    font.pixelSize: Theme.captionPx
+    font.pixelSize: Theme.bodyPx
+    font.weight: Theme.weightLabel
+    font.letterSpacing: Theme.headingTracking
+    verticalAlignment: Text.AlignVCenter
     topPadding: Theme.s4
 }

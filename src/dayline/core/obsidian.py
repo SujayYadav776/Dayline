@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -109,9 +110,49 @@ def note_rel_no_ext(settings: DailyNotesSettings, d: date) -> str:
     return "/".join(x for x in [settings.folder, *stem.split("/")] if x)
 
 
-def open_uri(vault_name: str, rel_no_ext: str) -> str:
-    """obsidian://open URI, strictly percent-encoded (FR-O6)."""
-    return f"obsidian://open?vault={quote(vault_name, safe='')}&file={quote(rel_no_ext, safe='')}"
+def open_uri(vault_name: str, rel_no_ext: str, block: str | None = None) -> str:
+    """obsidian://open URI, strictly percent-encoded (FR-O6). With `block`,
+    the file value carries an encoded #^anchor so Obsidian scrolls to it."""
+    file_part = quote(rel_no_ext, safe="")
+    if block:
+        file_part += "%23%5E" + quote(block, safe="")
+    return f"obsidian://open?vault={quote(vault_name, safe='')}&file={file_part}"
+
+
+def search_uri(vault_name: str, query: str) -> str:
+    """obsidian://search URI (core search action)."""
+    return f"obsidian://search?vault={quote(vault_name, safe='')}&query={quote(query, safe='')}"
+
+
+# Obsidian block references: ^id (alphanumeric, hyphens allowed), trailing on a line
+_BLOCK_REF_RE = re.compile(r"[ \t]\^([A-Za-z0-9][A-Za-z0-9-]{0,63})[ \t]*$")
+
+
+def block_ref_of(line: str) -> str | None:
+    """The ^anchor at the end of a rendered line, if the user wrote one."""
+    m = _BLOCK_REF_RE.search(line.rstrip("\r\n"))
+    return m.group(1) if m else None
+
+
+_JUMP_PHRASE_CHARS = 80
+
+
+def jump_uri(vault_name: str, rel_no_ext: str, rendered_line: str, description: str) -> str:
+    """Deep link to one task line (click-a-task → jump in Obsidian).
+
+    Strategy: a literal line number isn't addressable in Obsidian, so prefer a
+    block anchor the user already wrote (`^id` → open note#^id); otherwise run
+    a search for the task's text restricted to that day's note, which lands on
+    the exact line and highlights it. Empty/whitespace-only descriptions fall
+    back to opening the note itself."""
+    block = block_ref_of(rendered_line)
+    if block:
+        return open_uri(vault_name, rel_no_ext, block=block)
+    phrase = re.sub(r"\s+", " ", description.replace('"', " ")).strip()[:_JUMP_PHRASE_CHARS]
+    if phrase:
+        stem = rel_no_ext.rsplit("/", 1)[-1]
+        return search_uri(vault_name, f'file:"{stem}" "{phrase}"')
+    return open_uri(vault_name, rel_no_ext)
 
 
 def is_conflict_copy(name: str) -> bool:

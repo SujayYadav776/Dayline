@@ -17,6 +17,8 @@ Rectangle {
         text: chip.text
         font.family: Theme.fontFamily
         font.pixelSize: Theme.captionPx
-        color: Theme.textSecondary
+        font.weight: Theme.weightLabel
+        font.letterSpacing: Theme.headingTracking
+        color: Theme.text
     }
 }

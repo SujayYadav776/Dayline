@@ -160,3 +160,100 @@ def test_undo_stack_limit() -> None:
 
     u = UndoStack(limit=3)
     assert u._undo.maxlen == 3
+
+
+# ---- move_to_day (drag-to-reschedule) ----------------------------------------
+
+D2 = date(2026, 9, 24)
+
+
+def text_at(store: Store, d: date) -> str:
+    p = store.path_for(d)
+    return p.read_text("utf-8") if p.is_file() else ""
+
+
+def test_move_to_day_transfers_line_and_rewrites_due(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "renew passport 📅 2026-09-19")
+    editor.move_to_day(D, key, D2)
+    src = text_at(store, D)
+    dst = text_at(store, D2)
+    assert "renew passport" not in src
+    assert "renew passport 📅 2026-09-24" in dst  # due date follows the move
+
+
+def test_move_to_day_keeps_line_without_due(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "buy oat milk")
+    editor.move_to_day(D, key, D2)
+    assert "buy oat milk" not in text_at(store, D)
+    assert "- [ ] buy oat milk" in text_at(store, D2)
+
+
+def test_move_to_day_undo_restores_both_files(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "call dentist")
+    src_before = text_at(store, D)
+    editor.move_to_day(D, key, D2)
+    assert "call dentist" in text_at(store, D2)
+    assert editor.undo()
+    assert text_at(store, D) == src_before
+    assert "call dentist" not in text_at(store, D2)
+    assert editor.redo()
+    assert "call dentist" in text_at(store, D2)
+
+
+def test_move_to_day_same_day_noop(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "stay put")
+    before = text_at(store, D)
+    assert editor.move_to_day(D, key, D) is None
+    assert text_at(store, D) == before
+
+
+# ---- recurring tasks (🔁 spawn on completion) --------------------------------
+def test_toggle_recurring_spawns_next_instance_next_day(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "gym 🔁 every monday 📅 2026-09-19")
+    editor.toggle(D, key)
+    assert "[x] gym" in text(store)
+    nxt = store.path_for(date(2026, 9, 21))  # 09-19 is a Saturday
+    assert nxt.is_file()
+    body = nxt.read_text("utf-8")
+    assert "[ ] gym" in body and "🔁 every monday" in body and "📅 2026-09-21" in body
+
+
+def test_toggle_recurring_without_due_uses_note_date(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "standup 🔁 every day")
+    editor.toggle(D, key)
+    nxt = store.path_for(date(2026, 9, 20))
+    body = nxt.read_text("utf-8")
+    assert "[ ] standup 🔁 every day 📅 2026-09-20" in body
+
+
+def test_toggle_overdue_recurring_never_spawns_past(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "water 🔁 every week 📅 2026-09-12")  # a week overdue
+    editor.toggle(D, key)
+    # next is strictly after max(due, today) → 2026-09-26, not 09-19
+    assert store.path_for(date(2026, 9, 26)).is_file()
+    assert not store.path_for(date(2026, 9, 19)).read_text("utf-8").count("🔁") > 1
+
+
+def test_toggle_undo_restores_both_files_in_one_step(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "gym 🔁 every monday 📅 2026-09-19")
+    editor.toggle(D, key)
+    assert editor.undo() is True
+    assert "[ ] gym" in text(store) and "[x]" not in text(store)
+    nxt = store.path_for(date(2026, 9, 21))
+    assert "gym" not in nxt.read_text("utf-8")  # instance gone (note kept, never deleted)
+
+
+def test_toggle_non_recurring_unchanged(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "plain")
+    editor.toggle(D, key)
+    assert "[x] plain" in text(store)
+    assert editor.undo() is True
+    assert "[ ] plain" in text(store)
+
+
+def test_reopen_done_recurring_does_not_spawn(editor: TaskEditor, store: Store) -> None:
+    key = add(editor, "gym 🔁 every monday 📅 2026-09-19")
+    editor.toggle(D, key)  # open → done (spawns)
+    before = store.path_for(date(2026, 9, 21)).read_text("utf-8")
+    editor.toggle(D, key)  # done → open (no spawn)
+    assert store.path_for(date(2026, 9, 21)).read_text("utf-8") == before

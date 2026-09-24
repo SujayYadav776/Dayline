@@ -8,10 +8,22 @@ from typing import Any
 from PySide6.QtCore import Property, QObject, Signal
 
 from dayline.core.clock import logical_date
-from dayline.core.stats import StatsService
+from dayline.core.stats import DayStats, StatsService
 from dayline.core.store import Store
 
 _WEEKDAY = {"mon": 0, "sun": 6}
+
+
+def _heat_level(done: int) -> int:
+    if done == 0:
+        return 0
+    if done <= 1:
+        return 1
+    if done <= 2:
+        return 2
+    if done <= 4:
+        return 3
+    return 4
 
 
 class WeekViewModel(QObject):
@@ -24,7 +36,13 @@ class WeekViewModel(QObject):
         self._stats: StatsService | None = None
         self._week_start = "mon"
         self._anchor = date.today()  # any date within the shown week
+        self._selected: date | None = None  # day highlighted in the bottom strip
         self._days: list[dict[str, Any]] = []
+        self._strip: list[dict[str, Any]] = []
+        self._activity: list[dict[str, Any]] = []
+        self._activity_months: list[dict[str, Any]] = []
+        self._streak = 0
+        self._done_today = 0
         self._week_done = 0
         self._week_total = 0
         self._title = ""
@@ -48,10 +66,22 @@ class WeekViewModel(QObject):
     )
     rangeLabel = Property(str, lambda self: self._title, notify=changed)
     monthHeat = Property(list, lambda self: self._month_heat, notify=changed)
+    # Bottom week-strip cells + Progress-panel stats (paper design).
+    strip = Property(list, lambda self: self._strip, notify=changed)
+    streak = Property(int, lambda self: self._streak, notify=changed)
+    doneToday = Property(int, lambda self: self._done_today, notify=changed)
+    activity = Property(list, lambda self: self._activity, notify=changed)
+    activityMonths = Property(list, lambda self: self._activity_months, notify=changed)
 
     # -- navigation -----------------------------------------------------------
     def _week_start_date(self, anchor: date) -> date:
         return anchor - timedelta(days=(anchor.weekday() - _WEEKDAY[self._week_start]) % 7)
+
+    def set_anchor(self, d: date) -> None:
+        """Follow the day currently open in Today (keeps the strip in sync)."""
+        self._anchor = d
+        self._selected = d
+        self.refresh()
 
     def refresh(self) -> None:
         if self._store is None or self._stats is None:
@@ -82,7 +112,73 @@ class WeekViewModel(QObject):
         self._week_total = total
         self._title = f"{start:%d %b} – {start + timedelta(days=6):%d %b %Y}"
         self._month_heat = self._build_month_heat()
+        self._strip = self._build_strip(start, today)
+        self._done_today = self._stats.day(today).done
+        self._streak = self._build_streak(today)
+        self._activity, self._activity_months = self._build_activity(today)
         self.changed.emit()
+
+    def _build_strip(self, start: date, today: date) -> list[dict[str, Any]]:
+        """Seven cells for the bottom calendar strip (mockup): number, weekday
+        letter, today/selected flags, and completion for the column fill."""
+        out: list[dict[str, Any]] = []
+        for i in range(7):
+            d = start + timedelta(days=i)
+            st = self._stats.day(d) if self._stats is not None else DayStats(0, 0)
+            out.append(
+                {
+                    "dateStr": d.isoformat(),
+                    "dayNum": d.day,
+                    "letter": d.strftime("%a")[0].upper(),
+                    "isToday": d == today,
+                    "isSelected": d == self._selected,
+                    "isFuture": d > today,
+                    "percent": st.percent,
+                }
+            )
+        return out
+
+    def _build_streak(self, today: date) -> int:
+        """Consecutive days (ending today, or yesterday if today is still
+        untouched) with at least one completed task."""
+        assert self._stats is not None  # guarded by refresh()
+        d = today
+        if self._stats.day(d).done == 0:
+            d -= timedelta(days=1)
+        n = 0
+        while n < 365 and self._stats.day(d).done > 0:
+            n += 1
+            d -= timedelta(days=1)
+        return n
+
+    def _build_activity(self, today: date) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """GitHub-style heat-map: 13 week-columns × 7 day-rows, column-major
+        (QML Grid flow LayoutDown, rows 7), plus month labels per column."""
+        assert self._stats is not None
+        ws = _WEEKDAY[self._week_start]
+        this_week_start = today - timedelta(days=(today.weekday() - ws) % 7)
+        first_col = this_week_start - timedelta(weeks=12)
+        cells: list[dict[str, Any]] = []
+        months: list[dict[str, Any]] = []
+        prev_month: int | None = None
+        for w in range(13):
+            col0 = first_col + timedelta(weeks=w)
+            if col0.month != prev_month:
+                months.append({"col": w, "label": col0.strftime("%b")})
+                prev_month = col0.month
+            for i in range(7):
+                d = col0 + timedelta(days=i)
+                st = self._stats.day(d)
+                cells.append(
+                    {
+                        "dateStr": d.isoformat(),
+                        "done": st.done,
+                        "total": st.total,
+                        "level": _heat_level(st.done),
+                        "future": d > today,
+                    }
+                )
+        return cells, months
 
     def _build_month_heat(self) -> list[dict[str, Any]]:
         """FR-W3: month grid cells for a 7-column heat-map (leading blanks align

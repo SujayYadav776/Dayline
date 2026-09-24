@@ -19,7 +19,8 @@ Item {
             text: "Where do your daily notes live?"
             font.family: Theme.fontFamily
             font.pixelSize: Theme.titlePx
-            font.weight: Font.DemiBold
+            font.weight: Theme.weightHeading
+            font.letterSpacing: Theme.titleTracking
             color: Theme.text
         }
         Text {
@@ -101,12 +102,12 @@ Item {
             spacing: Theme.s8
 
             Rectangle {
-                width: parent.width - useBtn.width - Theme.s8
+                width: parent.width - useBtn.width - folderBtn.width - 2 * Theme.s8
                 height: 36
                 radius: Theme.radiusControl
                 color: Theme.surface
-                border.color: pathField.activeFocus ? Theme.accent : Theme.border
-                border.width: 1
+                border.color: pathField.activeFocus ? Theme.ring : Theme.input
+                border.width: pathField.activeFocus ? Theme.ringWidth : 1
                 TextInput {
                     id: pathField
                     anchors.fill: parent
@@ -137,20 +138,51 @@ Item {
                 width: 92
                 height: 36
                 radius: Theme.radiusControl
-                color: Theme.accent
+                color: useMa.pressed ? Theme.accentHover : Theme.accent
+                Behavior on color { enabled: Theme.animate; ColorAnimation { duration: Theme.motionMs } }
                 Text {
                     anchors.centerIn: parent
                     text: "Use vault"
-                    color: Theme.onAccent
+                    color: Theme.accentInk
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.bodyPx
-                    font.weight: Font.DemiBold
+                    font.weight: Theme.weightLabel
+                    font.letterSpacing: Theme.headingTracking
                 }
                 MouseArea {
+                    id: useMa
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.app.selectVault(pathField.text)
                 }
+            }
+            // no-Obsidian escape hatch: treat the pasted path as a plain folder
+            Rectangle {
+                id: folderBtn
+                width: fb.implicitWidth + Theme.s24
+                height: 36
+                radius: Theme.radiusControl
+                color: folderMa.pressed ? Theme.surfaceAlt : Theme.surface
+                border.color: Theme.input
+                border.width: 1
+                Behavior on color { enabled: Theme.animate; ColorAnimation { duration: Theme.motionMs } }
+                Text {
+                    id: fb
+                    anchors.centerIn: parent
+                    text: "Use as folder"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.bodyPx
+                    font.weight: Theme.weightLabel
+                }
+                MouseArea {
+                    id: folderMa
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.app.selectFolder(pathField.text)
+                }
+                Accessible.role: Accessible.Button
+                Accessible.name: "Use pasted path as a plain folder"
             }
         }
 

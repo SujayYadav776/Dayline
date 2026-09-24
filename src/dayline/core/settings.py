@@ -20,7 +20,7 @@ from dayline.core.obsidian import DEFAULT_FOLDER, DEFAULT_FORMAT
 
 log = logging.getLogger("dayline.core.settings")
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -28,12 +28,17 @@ class Settings:
     # General
     autostart: bool = False
     close_to_tray: bool = True
+    start_hidden: bool = True  # boot minimized to the tray (once a vault is set)
+    auto_hide: bool = False  # panel mode: dismiss the widget when it loses focus
+    completion_sound: bool = True  # soft tick when a task is checked off
     hotkey: str = "ctrl+alt+n"
     quick_add_enabled: bool = True
     # Updates (opt-in; a deliberate exception to the no-telemetry default)
     update_check_enabled: bool = False  # auto-check at most once a day, at startup
     update_last_check: str = ""  # ISO timestamp of the last automatic check
     # Obsidian
+    # "obsidian" = daily-notes vault; "folder" = any plain folder stores the notes
+    vault_mode: str = "obsidian"
     vault_path: str = ""
     folder: str = DEFAULT_FOLDER
     date_format: str = DEFAULT_FORMAT
@@ -42,17 +47,18 @@ class Settings:
     rollover_enabled: bool = True
     lookback: int = 30
     day_start: str = "00:00"  # "HH:MM", 00:00–06:00
-    # Notifications (off by default, FR-P7)
-    notifications_enabled: bool = False
-    morning_summary_at: str = ""  # "HH:MM" or "" = unset
+    # Notifications (due reminders; FR-P7 — default ON since v1.3.0, see migration)
+    notifications_enabled: bool = True
+    morning_summary_at: str = "09:00"  # "HH:MM" or "" = unset
     evening_reminder_at: str = ""
     # Appearance
-    theme: str = "system"  # system|light|dark
+    theme: str = "light"  # system|light|dark  (default light; "system" follows Windows)
     accent_custom: str = ""  # "" = follow Windows accent, else "#RRGGBB"
     sort_mode: str = "priority"  # priority|manual
     week_start: str = "mon"  # mon|sun
     reduce_motion: bool = False
     mica: bool = True  # Win11 translucent Mica backdrop (no-op elsewhere)
+    thin_paper: bool = False  # paper at ~92% opacity so the Mica blur peeks through
     # Data hygiene
     backup_keep_days: int = 7
     # Window memory (FR §4.3)
@@ -108,6 +114,8 @@ def validate(s: Settings) -> list[str]:
         fix("theme", s.theme, "system", "system|light|dark")
     if s.sort_mode not in ("priority", "manual"):
         fix("sort_mode", s.sort_mode, "priority", "priority|manual")
+    if s.vault_mode not in ("obsidian", "folder"):
+        fix("vault_mode", s.vault_mode, "obsidian", "obsidian|folder")
     if s.week_start not in ("mon", "sun"):
         fix("week_start", s.week_start, "mon", "mon|sun")
     if s.accent_custom and not re.fullmatch(r"(?i)#[0-9a-f]{6}", s.accent_custom):
@@ -142,7 +150,21 @@ def _migrate_v0(raw: dict[str, Any]) -> dict[str, Any]:  # pragma: no cover
     return raw
 
 
-_MIGRATIONS: dict[int, Any] = {0: _migrate_v0}
+def _migrate_v1(raw: dict[str, Any]) -> dict[str, Any]:
+    """v2: due reminders default ON.
+
+    Before v2 there was no UI to change these keys, so a stored
+    ``notifications_enabled: false`` with no times configured was never a
+    deliberate choice — upgrade it to the new 09:00 reminder default.
+    """
+    if raw.get("notifications_enabled") is False and not raw.get("morning_summary_at"):
+        raw["notifications_enabled"] = True
+        raw["morning_summary_at"] = "09:00"
+    raw["schema_version"] = 2
+    return raw
+
+
+_MIGRATIONS: dict[int, Any] = {0: _migrate_v0, 1: _migrate_v1}
 
 
 def load(path: Path) -> tuple[Settings, list[str]]:
