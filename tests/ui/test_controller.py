@@ -3,10 +3,12 @@ bottom-right of the work area (notification-center style)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtGui import QIcon
 
+from dayline.platform.hotkey import FakeBackend, GlobalHotkey
 from dayline.platform.tray import Tray
 from dayline.ui.app_controller import AppController
 
@@ -117,6 +119,17 @@ def test_show_window_positions_then_shows() -> None:
     assert win.x == 1920 - 360 - 12
 
 
+def test_public_anchor_docks_without_showing() -> None:
+    # startup path: window is already visible; the public helper must only
+    # position it bottom-right (app.py calls it on the visible-launch branch)
+    screen = _Screen(_Rect(0, 0, 1920, 1032))
+    win = _Window(screen, 360, 600)
+    _controller(win).anchor_bottom_right()
+    assert win.x == 1920 - 360 - 12
+    assert win.y == 1032 - 600 - 12
+    assert win.shown is False
+
+
 def test_anchor_is_safe_without_screen() -> None:
     class _NoScreen:
         def screen(self) -> None:
@@ -203,3 +216,72 @@ def test_morning_fire_due_only() -> None:
     c, tray = _toast_controller((5, 0))
     c._fire("morning")
     assert tray.msgs == [("Dayline", "5 due today")]
+
+
+class _RecordingHotkey(GlobalHotkey):
+    """Nominal GlobalHotkey subclass (CI mypy checks tests too) that records
+    the bind instead of touching user32."""
+
+    def __init__(self) -> None:
+        super().__init__(backend=FakeBackend(ok=False))
+        self.spec = ""
+        self.cb: Callable[[], None] | None = None
+        self.unbound = False
+
+    def bind(self, spec: str, callback: Callable[[], None]) -> bool:
+        self.spec, self.cb = spec, callback
+        return True
+
+    def unbind(self) -> None:
+        self.unbound = True
+
+
+class _HotkeyVM:
+    """Minimal VM surface for bind_hotkey: real Settings, dummy today."""
+
+    def __init__(self) -> None:
+        from dayline.core.settings import Settings
+
+        self.settings = Settings()
+
+
+def _hk_controller(win: Any, summon: GlobalHotkey | None) -> tuple[AppController, _RecordingHotkey]:
+    hk = _RecordingHotkey()
+    c = AppController(
+        window=win,
+        vm=_HotkeyVM(),
+        tray=None,
+        hotkey=hk,
+        autostart=None,
+        quick_add=lambda: None,
+        open_obsidian=lambda: None,
+        quit_app=lambda: None,
+        summon_hotkey=summon,
+    )
+    return c, hk
+
+
+def test_summon_hotkey_binds_show_window_and_unbinds_on_quit() -> None:
+    screen = _Screen(_Rect(0, 0, 1920, 1032))
+    win = _Window(screen, 360, 600)
+    shk = _RecordingHotkey()
+    c, hk = _hk_controller(win, shk)
+    assert c.bind_hotkey() is True
+    assert hk.spec == "ctrl+alt+n"  # quick-add unchanged
+    assert shk.spec == "ctrl+shift+d"  # summon bound on its own slot
+    assert shk.cb is not None
+    shk.cb()  # press the key while hidden
+    assert win.shown is True  # show_window semantics
+    assert win.x == 1920 - 360 - 12  # docks bottom-right like a summon
+    c.quit()
+    assert hk.unbound and shk.unbound
+
+
+def test_summon_hotkey_absent_is_noop() -> None:
+    screen = _Screen(_Rect(0, 0, 1920, 1032))
+    win = _Window(screen, 360, 600)
+    c, hk = _hk_controller(win, None)
+    assert c.bind_hotkey() is True  # quick-add still binds
+    assert c._summon_ok is False  # summon silently skipped
+    c.quit()
+    assert hk.unbound

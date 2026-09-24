@@ -43,21 +43,12 @@ ApplicationWindow {
         restoreMode: Binding.RestoreNone
     }
 
-    // Restore remembered size/position (PRD §4.3).
-    Component.onCompleted: {
-        win.qmlReady = true
-        var g = App.geometry
-        if (g && g.width > 0) {
-            win.width = g.width
-            win.height = g.height
-            if (g.x !== undefined) win.x = g.x
-            if (g.y !== undefined) win.y = g.y
-        }
-    }
+    // The window deliberately does NOT restore its last size/position:
+    // app.py anchors it bottom-right at startup, at the default small size.
+    Component.onCompleted: win.qmlReady = true
 
     // Close-to-tray (FR-P2): hide instead of quit when the setting is on.
     onClosing: (mouse) => {
-        App.saveGeometry(win.x, win.y, win.width, win.height)
         if (typeof Controller !== "undefined" && Controller && Controller.suppressClose())
             mouse.accepted = false
     }

@@ -2,6 +2,26 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Universal summon key (Ctrl+Shift+D).** While Dayline runs (tray or
+  desktop), pressing Ctrl+Shift+D anywhere brings the widget up, docked
+  bottom-right, and focuses it — never hides it. It's a second, independent
+  global hotkey: Ctrl+Alt+N stays the direct "summon + type a task" quick-add.
+  Both keys are listed in Settings → General ("Summon window" /
+  "Global quick-add"); the combo is configurable via `summon_hotkey` in the
+  config file.
+
+### Changed
+- **The window always opens small, bottom-right.** Dayline no longer restores
+  its last position or size on launch: every start docks it to the
+  notification-centre spot (bottom-right of the work area, taskbar excluded)
+  at the default compact 360×600, exactly like a tray summon already did.
+  Dragging/resizing still works for the current session only; the next launch
+  resets. (`app.py` anchors the visible window at startup via the controller;
+  Main.qml no longer applies or saves remembered geometry.)
+
 ## [1.3.0] — 2026-09-24
 
 ### Added

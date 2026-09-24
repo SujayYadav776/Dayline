@@ -34,6 +34,7 @@ class AppController(QObject):
         quick_add: Callable[[], None],
         open_obsidian: Callable[[], None],
         quit_app: Callable[[], None],
+        summon_hotkey: GlobalHotkey | None = None,
         parent: Any = None,
     ) -> None:
         super().__init__(parent)
@@ -41,6 +42,9 @@ class AppController(QObject):
         self._vm = vm
         self._tray = tray
         self._hotkey = hotkey
+        # second single-slot RegisterHotKey instance: the universal "summon"
+        # key lives beside quick-add instead of replacing it
+        self._summon_hk = summon_hotkey
         self._autostart = autostart
         self._quick_add = quick_add
         self._open_obsidian = open_obsidian
@@ -49,6 +53,7 @@ class AppController(QObject):
         self._native_filter: Any = None
         self._settings_handler: Any = None
         self._hotkey_ok = False
+        self._summon_ok = False
         self._notifiers: list[QTimer] = []
 
     # -- tray / close-to-tray --------------------------------------------------
@@ -61,6 +66,11 @@ class AppController(QObject):
     def show_window(self) -> None:
         """Surface the window (used by a second launch while tray-resident)."""
         self._show_and_raise()
+
+    def anchor_bottom_right(self) -> None:
+        """Dock the already-visible window to the work-area corner once at
+        startup — Dayline always opens bottom-right, never where it was left."""
+        self._anchor_bottom_right()
 
     def _show_and_raise(self) -> None:
         self._anchor_bottom_right()
@@ -104,6 +114,8 @@ class AppController(QObject):
             self._tray.hide()
         if self._hotkey is not None:
             self._hotkey.unbind()
+        if self._summon_hk is not None:
+            self._summon_hk.unbind()
         self._quit_app()
 
     # -- dark title bar --------------------------------------------------------
@@ -145,6 +157,14 @@ class AppController(QObject):
         except HotkeyError as exc:
             log.warning("hotkey bind failed: %s", exc)
             self._hotkey_ok = False
+        self._summon_ok = False
+        if self._summon_hk is not None:
+            try:
+                self._summon_ok = self._summon_hk.bind(
+                    self._vm.settings.summon_hotkey, self.show_window
+                )
+            except HotkeyError as exc:
+                log.warning("summon hotkey bind failed: %s", exc)
         return self._hotkey_ok
 
     @property

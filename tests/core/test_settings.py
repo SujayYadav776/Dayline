@@ -167,3 +167,18 @@ def test_vault_mode_invalid_clamped_by_validate() -> None:
     issues = validate(s)
     assert s.vault_mode == "obsidian"
     assert any("vault_mode" in i for i in issues)
+
+
+def test_summon_hotkey_defaults_and_roundtrip(tmp_path: Path) -> None:
+    assert Settings().summon_hotkey == "ctrl+shift+d"
+    s = Settings(summon_hotkey="ctrl+alt+space")
+    save(tmp_path / "config.json", s)
+    loaded, _ = load(tmp_path / "config.json")
+    assert loaded.summon_hotkey == "ctrl+alt+space"
+
+
+def test_summon_hotkey_missing_in_old_config_gets_default(tmp_path: Path) -> None:
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps({"schema_version": 2, "hotkey": "ctrl+alt+n"}), encoding="utf-8")
+    loaded, _ = load(p)
+    assert loaded.summon_hotkey == "ctrl+shift+d"

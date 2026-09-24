@@ -32,6 +32,7 @@ class Settings:
     auto_hide: bool = False  # panel mode: dismiss the widget when it loses focus
     completion_sound: bool = True  # soft tick when a task is checked off
     hotkey: str = "ctrl+alt+n"
+    summon_hotkey: str = "ctrl+shift+d"  # universal "bring Dayline up" key (never hides)
     quick_add_enabled: bool = True
     # Updates (opt-in; a deliberate exception to the no-telemetry default)
     update_check_enabled: bool = False  # auto-check at most once a day, at startup

@@ -180,6 +180,10 @@ def main(argv: list[str] | None = None) -> int:
         window.hide()
     elif pending_show["v"]:
         controller.show_window()
+    elif window.isVisible():
+        # always open notification-centre style: bottom-right, default small
+        # size — the last geometry is intentionally not restored
+        controller.anchor_bottom_right()
     if not window.isVisible() and getattr(controller, "_tray", None) is not None:
         # tray-first boot: tell the user where the app went (once per run)
         controller._tray.notify("Dayline", "Running in the tray — click the icon to open.")
@@ -211,6 +215,7 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
         on_quit=lambda: controller.quit(),
     )
     hotkey = GlobalHotkey()
+    summon_hk = GlobalHotkey()  # second slot: universal "bring Dayline up" key
     autostart = Autostart()
     controller = AppController(
         window=window,
@@ -221,6 +226,7 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
         quick_add=lambda: _trigger_quick_add(vm),
         open_obsidian=open_obsidian,
         quit_app=app.quit,
+        summon_hotkey=summon_hk,
     )
     engine.rootContext().setContextProperty("Controller", controller)
 

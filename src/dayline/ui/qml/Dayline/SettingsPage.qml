@@ -235,6 +235,7 @@ Item {
                     }
                 }
                 Labeled { label: "Global quick-add"; value: page.vm.hotkey }
+                Labeled { label: "Summon window"; value: page.vm.summonHotkey }
             }
 
             // ---- Updates ---------------------------------------------------

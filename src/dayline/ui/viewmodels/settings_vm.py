@@ -70,6 +70,7 @@ class SettingsViewModel(QObject):
     completionSound = Property(bool, lambda self: self._s.completion_sound, notify=changed)
     autostart = Property(bool, lambda self: self._s.autostart, notify=changed)
     hotkey = Property(str, lambda self: self._s.hotkey, notify=changed)
+    summonHotkey = Property(str, lambda self: self._s.summon_hotkey, notify=changed)
     quickAddEnabled = Property(bool, lambda self: self._s.quick_add_enabled, notify=changed)
     updateCheckEnabled = Property(bool, lambda self: self._s.update_check_enabled, notify=changed)
     notificationsEnabled = Property(
