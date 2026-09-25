@@ -1,14 +1,17 @@
-"""Global quick-add hotkey (FR-P5): RegisterHotKey via ctypes + native event filter.
+"""Global hotkeys (FR-P5): RegisterHotKey via ctypes + one native event filter.
 
-The modifier/key parsing is pure and unit-tested; the Win32 registration sits
-behind a ``HotkeyBackend`` protocol with a ``FakeBackend`` for tests. Real
-registration is verified on a Windows run.
+Several GlobalHotkey instances can coexist: each draws a unique Win32 id from
+a counter and stores its callback in a module-level registry, which the
+app-wide filter consults to dispatch WM_HOTKEY messages. The modifier/key
+parsing is pure and unit-tested; registration sits behind a ``HotkeyBackend``
+protocol with a ``FakeBackend`` for tests.
 """
 
 from __future__ import annotations
 
 import ctypes
 import ctypes.wintypes
+import itertools
 import sys
 from collections.abc import Callable
 from typing import Protocol
@@ -105,15 +108,21 @@ class FakeBackend:
 
 
 _WM_HOTKEY = 0x0312
-_HOTKEY_ID = 0xD0DA
+_HOTKEY_ID_BASE = 0xD0DA
+_ID_COUNTER = itertools.count(_HOTKEY_ID_BASE)
+
+# Win32 id → callback, filled by GlobalHotkey.bind() and consulted by the
+# single app-wide native filter. Module-level because the filter sees only
+# raw MSG structs — the id is the only join key.
+_CALLBACKS: dict[int, Callable[[], None]] = {}
 
 
 class HotkeyFilter(QAbstractNativeEventFilter):
-    """Routes WM_HOTKEY for our id to a callback. Filter installed app-wide."""
+    """Routes WM_HOTKEY for every registered id to its callback. Filter
+    installed app-wide; one instance serves any number of GlobalHotkeys."""
 
-    def __init__(self, callback: Callable[[], None]) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self._callback = callback
 
     def nativeEventFilter(self, eventType: object, message: object) -> tuple[bool, int]:
         if sys.platform != "win32":
@@ -125,27 +134,35 @@ class HotkeyFilter(QAbstractNativeEventFilter):
             msg = ctypes.wintypes.MSG.from_address(ptr)
         except (ValueError, OSError):
             return False, 0
-        if msg.message == _WM_HOTKEY and msg.wParam == _HOTKEY_ID:
-            self._callback()
-            return True, 0
+        if msg.message == _WM_HOTKEY:
+            callback = _CALLBACKS.get(int(msg.wParam))
+            if callback is not None:
+                callback()
+                return True, 0
         return False, 0
 
 
 class GlobalHotkey:
+    """One hotkey slot: unique Win32 id, its own backend registration."""
+
     def __init__(self, backend: HotkeyBackend | None = None) -> None:
         self._backend = (
             backend
             if backend is not None
             else (WinBackend() if sys.platform == "win32" else FakeBackend(ok=False))
         )
+        self._id = next(_ID_COUNTER)
         self.registered = False
 
     def bind(self, spec: str, callback: Callable[[], None]) -> bool:
         mods, vk = parse_hotkey(spec)
-        self.registered = self._backend.register(_HOTKEY_ID, mods, vk)
+        self.registered = self._backend.register(self._id, mods, vk)
+        if self.registered:
+            _CALLBACKS[self._id] = callback
         return self.registered
 
     def unbind(self) -> None:
         if self.registered:
-            self._backend.unregister(_HOTKEY_ID)
+            self._backend.unregister(self._id)
+            _CALLBACKS.pop(self._id, None)
             self.registered = False

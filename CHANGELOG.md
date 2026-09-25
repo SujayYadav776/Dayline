@@ -4,6 +4,20 @@ All notable changes to Dayline follow [Semantic Versioning](https://semver.org/)
 
 ## [Unreleased]
 
+### Fixed
+- **Summon hotkey (Ctrl+Shift+D) never fired.** The hotkey layer was
+  single-slot: both the quick-add key and the new summon key registered the
+  same Win32 id (0xD0DA), so the second RegisterHotKey silently failed, and
+  the native event filter only ever routed one hard-wired callback. Each
+  GlobalHotkey now draws a unique id from a counter, bind() stores its
+  callback in an id→callback registry, and one app-wide filter dispatches
+  every registered hotkey. Ctrl+Alt+N behavior is unchanged.
+- **Settings dropdowns.** The restyled Select fed its popup ListView the
+  delegate Component instead of `delegateModel`, so the option list rendered
+  zero rows and every dropdown (Theme / Sort by / Week starts on) looked
+  dead. Popups now open with the full option list and the current row
+  highlighted.
+
 ### Changed
 - **Week page, shadcn/ui design language.** The week overview was rebuilt on
   shadcn's component grammar (its CLI can't target QML, so this is a faithful

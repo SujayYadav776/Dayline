@@ -80,6 +80,31 @@ def test_global_hotkey_conflict_returns_false() -> None:
     assert hk.bind("ctrl+alt+n", lambda: None) is False
 
 
+def test_two_hotkeys_get_distinct_ids_and_route_independently() -> None:
+    """Regression: quick-add and summon both used id 0xD0DA, so the second
+    RegisterHotKey failed and the summon key never fired. Each instance must
+    now draw its own id and register its own callback in the dispatch map."""
+    from dayline.platform.hotkey import _CALLBACKS
+
+    backend = FakeBackend(ok=True)
+    quick: list[str] = []
+    summon: list[str] = []
+    hk1 = GlobalHotkey(backend)
+    hk2 = GlobalHotkey(backend)
+    assert hk1.bind("ctrl+alt+n", lambda: quick.append("q")) is True
+    assert hk2.bind("ctrl+shift+d", lambda: summon.append("s")) is True
+    assert hk1._id != hk2._id
+    assert set(backend.registered) == {hk1._id, hk2._id}
+    # the native filter dispatches on the id carried in WM_HOTKEY's wParam
+    _CALLBACKS[hk1._id]()
+    _CALLBACKS[hk2._id]()
+    assert quick == ["q"] and summon == ["s"]
+    hk1.unbind()
+    hk2.unbind()
+    assert hk1._id not in _CALLBACKS and hk2._id not in _CALLBACKS
+    assert backend.registered == {}
+
+
 # ---- Mica backdrop ---------------------------------------------------------
 @pytest.mark.parametrize("build", [22000, 22621, 26200])
 def test_supports_system_backdrop_on_win11(build: int) -> None:

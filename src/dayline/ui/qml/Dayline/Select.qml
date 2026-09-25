@@ -46,8 +46,12 @@ ComboBox {
         contentItem: ListView {
             clip: true
             implicitHeight: contentHeight
-            model: control.popup.visible ? control.delegate : null
-            ScrollBar.vertical: ScrollBar {}
+            // NOT control.delegate — that's the Component, not the model.
+            // Basic/ComboBox.qml binds delegateModel; without it the popup
+            // renders zero rows and looks dead.
+            model: popup.visible ? control.delegateModel : null
+            currentIndex: control.highlightedIndex
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         }
 
         background: Rectangle {

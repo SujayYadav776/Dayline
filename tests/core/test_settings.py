@@ -182,3 +182,33 @@ def test_summon_hotkey_missing_in_old_config_gets_default(tmp_path: Path) -> Non
     p.write_text(json.dumps({"schema_version": 2, "hotkey": "ctrl+alt+n"}), encoding="utf-8")
     loaded, _ = load(p)
     assert loaded.summon_hotkey == "ctrl+shift+d"
+
+
+def test_all_toggle_setters_roundtrip_and_notify() -> None:
+    """Every Settings toggle: setter flips the value, the VM property reads it
+    back, and the applied(group) signal fires so app-side effects run."""
+    from dayline.ui.viewmodels.settings_vm import SettingsViewModel
+
+    s = Settings()
+    vm = SettingsViewModel(s)
+    seen: list[str] = []
+    vm.applied.connect(lambda g: seen.append(g))
+    cases = [
+        (vm.setMica, "mica", False, "appearance"),
+        (vm.setThinPaper, "thin_paper", True, "appearance"),
+        (vm.setRolloverEnabled, "rollover_enabled", False, "rollover"),
+        (vm.setStartHidden, "start_hidden", False, "general"),
+        (vm.setCloseToTray, "close_to_tray", False, "general"),
+        (vm.setAutoHide, "auto_hide", True, "general"),
+        (vm.setDueReminders, "notifications_enabled", False, "notifications"),
+        (vm.setCompletionSound, "completion_sound", False, "general"),
+        (vm.setAutostart, "autostart", True, "general"),
+        (vm.setUpdateCheckEnabled, "update_check_enabled", True, "updates"),
+        (vm.setQuickAddEnabled, "quick_add_enabled", False, "general"),
+    ]
+    for setter, field, want, group in cases:
+        before = getattr(s, field)
+        setter(want)
+        assert getattr(s, field) == want, field
+        assert group in seen, field
+        setter(before)  # restore
