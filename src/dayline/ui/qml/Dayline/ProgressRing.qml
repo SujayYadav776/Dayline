@@ -8,6 +8,7 @@ Item {
 
     required property real value        // 0..1, may bind to a live property
     property string label: ""
+    property bool showValue: true       // centre % readout (off for tiny rings)
     property int lineWidth: 8
     property color trackColor: Theme.surfaceAlt
     property color progressColor: Theme.accent
@@ -64,7 +65,9 @@ Item {
     Column {
         anchors.centerIn: parent
         spacing: 0
+        visible: root.showValue || root.label !== ""
         Text {
+            visible: root.showValue
             anchors.horizontalCenter: parent.horizontalCenter
             text: Math.round(root.value * 100) + "%"
             font.family: Theme.fontFamily

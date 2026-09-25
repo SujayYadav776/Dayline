@@ -2,6 +2,21 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Week page, shadcn/ui design language.** The week overview was rebuilt on
+  shadcn's component grammar (its CLI can't target QML, so this is a faithful
+  port, not an install): dashboard summary card (uppercase eyebrow → 28 px
+  headline percentage → muted caption, hairline, ring + "N still open"), the
+  seven day rows are now a real **table** inside a card — DAY / PROGRESS /
+  DONE micro-headers, hairline separators, hover wash, thin 6 px progress
+  tracks, today marked with an accent dot + tint, future days dimmed — and
+  the heat-map card gained a Less→More legend. Ghost icon buttons for ‹ ›,
+  an outline "This week" button, the whole page scrolls, and the range label
+  elides instead of colliding. All bindings, a11y names and the paper
+  palette are unchanged.
+
 ## [1.3.1] — 2026-09-25
 
 ### Added
