@@ -236,6 +236,9 @@ def _integrate_windows(app: Any, engine: Any, vm: Any, window: Any) -> Any:
         controller._tray = None  # no tray → notify() no-ops, menu unavailable
     # global hotkey via native event filter (Windows only; needs a message loop)
     if sys.platform == "win32":
+        from dayline.platform.hotkey import set_hotkey_hwnd
+
+        set_hotkey_hwnd(int(window.winId()))
         qf = HotkeyFilter()
         app.installNativeEventFilter(qf)
         controller.bind_hotkey()

@@ -5,13 +5,16 @@ All notable changes to Dayline follow [Semantic Versioning](https://semver.org/)
 ## [Unreleased]
 
 ### Fixed
-- **Summon hotkey (Ctrl+Shift+D) never fired.** The hotkey layer was
-  single-slot: both the quick-add key and the new summon key registered the
-  same Win32 id (0xD0DA), so the second RegisterHotKey silently failed, and
-  the native event filter only ever routed one hard-wired callback. Each
-  GlobalHotkey now draws a unique id from a counter, bind() stores its
-  callback in an id→callback registry, and one app-wide filter dispatches
-  every registered hotkey. Ctrl+Alt+N behavior is unchanged.
+- **Global hotkeys never fired (Ctrl+Shift+D summon and Ctrl+Alt+N
+  quick-add).** Two stacked bugs: (1) the hotkey layer was single-slot, so
+  the summon key collided with quick-add on Win32 id 0xD0DA and its
+  RegisterHotKey silently failed — each GlobalHotkey now draws a unique id
+  and bind() stores callbacks in an id→callback registry dispatched by one
+  app-wide filter; (2) registration used a *thread* hotkey (hwnd=None), but
+  Qt6's event dispatcher only routes **window** messages through native
+  event filters, so WM_HOTKEY never reached the callback even when
+  registered. Hotkeys now register against the app window's HWND (verified
+  end-to-end with a real SendInput keypress).
 - **Settings dropdowns.** The restyled Select fed its popup ListView the
   delegate Component instead of `delegateModel`, so the option list rendered
   zero rows and every dropdown (Theme / Sort by / Week starts on) looked

@@ -12,6 +12,7 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes
 import itertools
+import logging
 import sys
 from collections.abc import Callable
 from typing import Protocol
@@ -73,8 +74,23 @@ class HotkeyBackend(Protocol):
     def unregister(self, hotkey_id: int) -> None: ...
 
 
+# Qt's event dispatcher hands only WINDOW messages to native event filters;
+# a thread hotkey (RegisterHotKey with hwnd=None) posts WM_HOTKEY with
+# hwnd==NULL, which Qt dispatches without ever consulting the filter — so
+# the callback would never fire. Registering against the app window's HWND
+# makes WM_HOTKEY a window message, which the filter does see.
+_HWND: int = 0
+
+
+def set_hotkey_hwnd(hwnd: int) -> None:
+    """Point hotkey registration at the app window (call before bind, and
+    again whenever the native window is recreated)."""
+    global _HWND
+    _HWND = hwnd
+
+
 class WinBackend:
-    """RegisterHotKey on the current thread's message queue."""
+    """RegisterHotKey bound to the app window (see _HWND note)."""
 
     _user32 = None
 
@@ -85,12 +101,11 @@ class WinBackend:
     def register(self, hotkey_id: int, mods: int, vk: int) -> bool:
         if self._user32 is None:
             return False
-        # hwnd=None → thread hotkey; requires a running message loop (Qt has one)
-        return bool(self._user32.RegisterHotKey(None, hotkey_id, mods, vk))
+        return bool(self._user32.RegisterHotKey(_HWND or None, hotkey_id, mods, vk))
 
     def unregister(self, hotkey_id: int) -> None:
         if self._user32 is not None:
-            self._user32.UnregisterHotKey(None, hotkey_id)
+            self._user32.UnregisterHotKey(_HWND or None, hotkey_id)
 
 
 class FakeBackend:
@@ -159,6 +174,13 @@ class GlobalHotkey:
         self.registered = self._backend.register(self._id, mods, vk)
         if self.registered:
             _CALLBACKS[self._id] = callback
+        elif sys.platform == "win32":  # pragma: no cover - needs real Win32
+            logging.getLogger("dayline.platform.hotkey").warning(
+                "RegisterHotKey(%s, id=%s) failed: winerr %s",
+                spec,
+                hex(self._id),
+                ctypes.windll.kernel32.GetLastError(),
+            )
         return self.registered
 
     def unbind(self) -> None:
