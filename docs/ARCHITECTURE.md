@@ -87,4 +87,6 @@ src/dayline/
 | §1.6 perf (week ≤200ms, 500 tasks) | stats cache, store | test_hardening | ✅ |
 | §4.7 accessibility | Accessible.* across QML | test_hardening | ✅ |
 
-Remaining: release packaging + About + v1.0.0 (M7).
+Milestones M0–M7 shipped: packaging, About, and the tag-gated CI release flow
+are live (v1.3.2 current). Post-v1.0 design/feature decisions continue in
+`DECISIONS.md` (D-020+) with user-facing notes in `CHANGELOG.md`.

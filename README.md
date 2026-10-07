@@ -5,7 +5,10 @@ daily notes stay plain Markdown checkboxes; Dayline adds a focused Today view,
 a live progress ring, automatic carry-over of unfinished tasks, a weekly
 overview with a month heat-map, a system tray, and a global quick-add hotkey.
 
-**Status:** v1.0.0 — feature-complete per the PRD (P0 + P1).
+**Status:** v1.3.2 — feature-complete per the PRD (P0 + P1), plus the paper
+design system, tray-first widget mode, folder storage (no Obsidian required),
+natural-language quick add, recurrence (🔁), move-to-day, due reminders,
+global summon hotkeys, and an opt-in self-updater.
 
 Design principles: never corrupt a note (surgical, atomic, byte-identical
 round-trips), zero telemetry, and a calm keyboard-first UI that follows the
@@ -24,7 +27,7 @@ uv run python -m dayline                 # run the app
 uv run python -m dayline --minimized     # start hidden to tray
 uv run python -m dayline --selftest      # boot UI, verify QML, exit 0/1
 
-uv run pytest -q                         # 150 tests (Qt runs offscreen)
+uv run pytest -q                         # 315 tests (Qt runs offscreen)
 uv run ruff check . && uv run ruff format --check .
 uv run mypy                              # strict on core/
 ```
@@ -47,8 +50,8 @@ dist\Dayline\Dayline.exe --selftest                       # frozen smoke (exit 0
 
 ```sh
 winget install JRSoftware.InnoSetup
-"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 packaging\installer.iss
-# -> dist\installer\Dayline-Setup-1.0.0.exe  (per-user, no admin; never deletes user data)
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" /DAppVersion=1.3.2 packaging\installer.iss
+# -> dist\installer\Dayline-Setup-1.3.2.exe  (per-user, no admin; never deletes user data)
 ```
 
 ## Updates (opt-in)
