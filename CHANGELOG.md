@@ -2,7 +2,7 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.2] — 2026-10-07
 
 ### Fixed
 - **Global hotkeys never fired (Ctrl+Shift+D summon and Ctrl+Alt+N
