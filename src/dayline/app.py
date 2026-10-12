@@ -50,7 +50,7 @@ def configure_logging() -> None:
 
 
 def load_bundled_fonts() -> None:
-    """Register the design fonts (Varela Round / Wallpoet / LEMON MILK) with Qt.
+    """Register the design fonts (DM Sans / Wallpoet / LEMON MILK) with Qt.
 
     The paper design system binds to these families by name (Theme.qml);
     Segoe UI stays as the fallback if a file is missing."""

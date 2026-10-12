@@ -2,6 +2,15 @@
 
 All notable changes to Dayline follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **Default UI font is now DM Sans.** The whole interface switched from Varela
+  Round to DM Sans (Regular/Medium/SemiBold/Bold bundled; DemiBold/Bold
+  headings now use real weight instances instead of synthesized ones). The big
+  pixel date keeps Wallpoet, and the typewriter headings and menu font are
+  unchanged.
+
 ## [1.3.2] — 2026-10-07
 
 ### Fixed

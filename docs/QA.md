@@ -41,7 +41,7 @@ Perform on the installed build (not dev tree) unless noted. Tick with date + bui
 - [ ] Ribbon (top-left) opens the nav drawer; `‹ TODAY ›` steps days; person glyph → Settings.
 - [ ] Bottom week-strip: red circle on today, hairline column dividers, gray completion fill; tapping a day opens it; the raised `⌃` tab slides up the Progress panel.
 - [ ] Progress panel: "Progress"/"My week"/"Activity" in the typewriter serif; My-week card scrolls if the day is long; Day streak / Tasks done counts; 13-week Activity heat-map with one month label per month (no duplicates).
-- [ ] Bundled fonts render (Varela Round body, Wallpoet date) — if a font is missing the layout falls back to Segoe UI without breaking.
+- [ ] Bundled fonts render (DM Sans body, Wallpoet date) — if a font is missing the layout falls back to Segoe UI without breaking.
 - [ ] App/taskbar/tray icon + onboarding + About card all show the exact brand logo.
 - [ ] Tray-first: with a vault configured, launching Dayline shows NO window — a "Running in the tray" toast appears instead; left-clicking the tray icon opens the small 360×600 widget; launching the exe a second time re-raises the running window; X hides to tray; "Start hidden in tray" toggle in Settings → General flips the boot behavior.
 - [ ] Notification-centre placement: every tray summon (icon click, menu Show, second launch) opens the widget docked bottom-right, just above the taskbar; on a secondary monitor it uses that monitor's work area; resizing keeps the bottom-right corner pinned on next summon.

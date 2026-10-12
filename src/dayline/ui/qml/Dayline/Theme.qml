@@ -3,7 +3,7 @@ import QtQuick
 
 // Single source of design tokens (PRD §4.2). All pages/components bind here.
 // Visual language is the "paper" design system ported from the reference
-// mockups: warm paper-textured background, red bookmark accent, Varela Round
+// mockups: warm paper-textured background, red bookmark accent, DM Sans
 // body type, Courier New for the typewriter headings, Wallpoet for the big
 // pixel date, white rounded cards with soft shadows over the grain.
 QtObject {
@@ -32,7 +32,7 @@ QtObject {
     readonly property int ringOffset: 2
 
     // ---- typography -------------------------------------------------------
-    readonly property string fontFamily: "Varela Round, Segoe UI"
+    readonly property string fontFamily: "DM Sans, Segoe UI"  // bundled DMSans-*.ttf
     readonly property string serifFamily: "Courier New"     // typewriter headings
     readonly property string pixelFamily: "Wallpoet"        // big date digits
     // LEMON MILK (bundled LEMONMILK-Regular.otf) — staggered nav menu labels
